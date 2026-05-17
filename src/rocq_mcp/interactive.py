@@ -1776,6 +1776,7 @@ async def run_step_multi(
     from_state: int | None = None,
     *,
     include_warnings: bool = True,
+    timeouts: list[float] | None = None,
 ) -> dict[str, Any]:
     """Core implementation of rocq_step_multi (testable without FastMCP Context).
 
@@ -1784,6 +1785,25 @@ async def run_step_multi(
 
     When ``include_warnings=False``, per-tactic feedback drops entries at
     LSP Warning severity (level 2).
+
+    Per-tactic timeouts:
+        By default the scalar ``pet_timeout`` is divided evenly across all
+        tactics (``max(1, int(pet_timeout / len(tactics)))``).  This is a
+        crude budget that assumes tactics are uniform in cost.  When tactic
+        costs are known to be heterogeneous (e.g. mixing cheap decision
+        procedures with heavier automation), callers may pass ``timeouts``
+        — a list of per-tactic budgets in seconds.  ``timeouts`` must have
+        the same length as ``tactics`` and is rejected up front otherwise.
+        Each value is interpreted in the same units as ``pet_timeout`` and
+        is clamped to a minimum of 1 second; non-eligible tactics (bullets,
+        focus braces) still receive ``None`` regardless of ``timeouts``.
+
+    Per-tactic wall time:
+        Each entry in the response ``results`` list carries a ``time_ms``
+        field — a non-negative integer measuring wall-clock time spent in
+        the underlying ``pet.run`` call, recorded with
+        :func:`time.perf_counter`.  The field is present on both success
+        and failure entries.
     """
     # Validate each tactic up front
     if len(tactics) > _MAX_STEP_MULTI_TACTICS:
@@ -1805,8 +1825,26 @@ async def run_step_multi(
                 f"Forbidden in tactic {tac!r}: {forbidden}",
             )
 
+    # Validate per-tactic timeouts list (if supplied) before acquiring pet.
+    if timeouts is not None and len(timeouts) != len(tactics):
+        return _server._fail(
+            lifespan_state,
+            "rocq_step_multi",
+            (
+                f"timeouts length {len(timeouts)} does not match "
+                f"tactics length {len(tactics)}."
+            ),
+        )
+
     timeout: float = lifespan_state["pet_timeout"]
-    hard_timeout = _compute_hard_timeout(timeout)
+    # Hard (process-level) timeout must cover the worst case: either the
+    # scalar budget (divided across tactics) or the sum of per-tactic
+    # budgets when an explicit list is supplied.
+    if timeouts is not None:
+        soft_total = float(sum(timeouts))
+    else:
+        soft_total = timeout
+    hard_timeout = _compute_hard_timeout(soft_total)
 
     # Quick pre-check to avoid acquiring lock for invalid states.
     # Re-validated inside _execute (state may be invalidated between checks).
@@ -1846,19 +1884,26 @@ async def run_step_multi(
 
         total_feedback_size = 0
 
-        for tactic in tactics:
+        for idx, tactic in enumerate(tactics):
             tac = tactic.strip()
             if tac not in ("{", "}") and not tac.endswith("."):
                 tac += "."
 
-            per_tactic_budget = max(1, int(timeout / len(tactics)))
+            if timeouts is not None:
+                raw_budget = float(timeouts[idx])
+                per_tactic_budget = max(1, int(raw_budget))
+                budget_eligible = raw_budget >= 1
+            else:
+                per_tactic_budget = max(1, int(timeout / len(tactics)))
+                budget_eligible = timeout >= 1
             tac_rocq_timeout = (
                 per_tactic_budget
-                if _is_timeout_eligible(tac) and timeout >= 1
+                if _is_timeout_eligible(tac) and budget_eligible
                 else None
             )
 
             entry_dict: dict[str, Any] = {"tactic": tac}
+            _t0 = time.perf_counter()
             try:
                 new_state = pet.run(parent_state, tac, timeout=tac_rocq_timeout)
 
@@ -1894,6 +1939,10 @@ async def run_step_multi(
                 entry_dict["success"] = False
                 entry_dict["reason"] = "tactic_failed"
                 entry_dict["error"] = e.message
+            finally:
+                entry_dict["time_ms"] = max(
+                    0, int((time.perf_counter() - _t0) * 1000)
+                )
 
             partial_state["partial_results"].append(entry_dict)
 

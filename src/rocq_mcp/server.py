@@ -1840,6 +1840,7 @@ async def rocq_step_multi(
     tactics: list[str],
     from_state: int | None = None,
     include_warnings: bool = True,
+    timeouts: list[float] | None = None,
     ctx: Context = None,
 ) -> dict[str, Any]:
     """Try multiple tactics at once — find what works without guessing.
@@ -1884,6 +1885,17 @@ async def rocq_step_multi(
             tactic.
         include_warnings: If True (default), per-tactic ``feedback`` includes
             all severities.  If False, drop entries at LSP Warning severity.
+        timeouts: Optional list of per-tactic Rocq timeouts in seconds.  If
+            provided, its length must equal ``len(tactics)`` and each value
+            is used as the Rocq-level ``Timeout`` budget for the matching
+            entry (clamped to a minimum of 1 second; non-eligible tactics
+            still get ``None``).  When omitted, the scalar ``pet_timeout``
+            is divided evenly across all tactics — convenient but a poor
+            fit for batteries that mix cheap and expensive tactics.
+
+    Each entry in the returned ``results`` list carries a ``time_ms``
+    field — a non-negative integer of wall-clock milliseconds spent in
+    the underlying tactic call.
 
     On ``pet_restarted: True``, call ``rocq_diag`` for memory headroom and
     recent error history.
@@ -1900,6 +1912,7 @@ async def rocq_step_multi(
         lifespan_state=ctx.lifespan_context,
         from_state=from_state,
         include_warnings=include_warnings,
+        timeouts=timeouts,
     )
 
 
