@@ -1161,3 +1161,66 @@ class TestCollectTocNames:
         toc = [("x", [_e("x", 2)])]
         names = _collect_toc_names(toc, source=source)
         assert names == ["Real.x"]
+
+
+# ---------------------------------------------------------------------------
+# TestAssumptionsTimeoutForwarding: per-call timeout reaches run_query
+# ---------------------------------------------------------------------------
+
+
+class TestAssumptionsTimeoutForwarding:
+    """Per-call ``timeout`` is plumbed from run_assumptions to run_query.
+
+    Mock-based test that doesn't require pet so it runs in CI without
+    coq-lsp. Verifies the contract that callers can override the
+    session-wide ROCQ_PET_TIMEOUT on a per-call basis.
+    """
+
+    @pytest.mark.asyncio
+    async def test_run_assumptions_forwards_timeout(self, monkeypatch, tmp_path):
+        """run_assumptions(timeout=X) forwards X to run_query."""
+        import rocq_mcp.interactive as _int
+
+        vfile = tmp_path / "t.v"
+        vfile.write_text("Theorem t : True. Proof. exact I. Qed.\n")
+        captured: dict = {}
+
+        async def fake_run_query(**kw):
+            captured.update(kw)
+            return {"success": True, "output": "Closed under the global context"}
+
+        monkeypatch.setattr(_int, "run_query", fake_run_query)
+
+        lifespan_state = {"pet_timeout": 30.0}
+        await run_assumptions(
+            name="t",
+            file=str(vfile),
+            workspace=str(tmp_path),
+            lifespan_state=lifespan_state,
+            timeout=120.0,
+        )
+        assert captured["timeout"] == 120
+
+    @pytest.mark.asyncio
+    async def test_run_assumptions_default_timeout_is_none(self, monkeypatch, tmp_path):
+        """Without explicit timeout, run_assumptions forwards None."""
+        import rocq_mcp.interactive as _int
+
+        vfile = tmp_path / "t.v"
+        vfile.write_text("Theorem t : True. Proof. exact I. Qed.\n")
+        captured: dict = {}
+
+        async def fake_run_query(**kw):
+            captured.update(kw)
+            return {"success": True, "output": "Closed under the global context"}
+
+        monkeypatch.setattr(_int, "run_query", fake_run_query)
+
+        lifespan_state = {"pet_timeout": 30.0}
+        await run_assumptions(
+            name="t",
+            file=str(vfile),
+            workspace=str(tmp_path),
+            lifespan_state=lifespan_state,
+        )
+        assert captured.get("timeout") is None

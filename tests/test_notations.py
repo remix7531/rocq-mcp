@@ -313,3 +313,63 @@ class TestRunNotationsReal:
         assert "_ + _" in lines[1]
         assert "_ = _" in lines[2]
         assert "_ * _" in lines[3]
+
+
+# ---------------------------------------------------------------------------
+# TestNotationsTimeoutForwarding: per-call timeout reaches _run_with_pet
+# ---------------------------------------------------------------------------
+
+import pytest as _pytest_tf
+
+
+class TestNotationsTimeoutForwarding:
+    """Per-call ``timeout`` is plumbed from run_notations to _run_with_pet."""
+
+    @_pytest_tf.mark.asyncio
+    async def test_run_notations_forwards_timeout(self, monkeypatch, tmp_path):
+        """run_notations(timeout=X) forwards X to _run_with_pet."""
+        import rocq_mcp.server as srv
+        from rocq_mcp.interactive import run_notations
+
+        captured: dict = {}
+
+        async def fake_run_with_pet(fn, lifespan_state, tool, **kw):
+            captured.update(kw)
+            captured["tool"] = tool
+            return {"success": True, "output": ""}
+
+        monkeypatch.setattr(srv, "_run_with_pet", fake_run_with_pet)
+
+        lifespan_state = {"pet_timeout": 30.0}
+        await run_notations(
+            statement="forall n : nat, n = n",
+            preamble="",
+            workspace=str(tmp_path),
+            lifespan_state=lifespan_state,
+            timeout=120.0,
+        )
+        assert captured["tool"] == "rocq_notations"
+        assert captured["timeout"] == 120.0
+
+    @_pytest_tf.mark.asyncio
+    async def test_run_notations_default_timeout_is_none(self, monkeypatch, tmp_path):
+        """Without explicit timeout, run_notations forwards None."""
+        import rocq_mcp.server as srv
+        from rocq_mcp.interactive import run_notations
+
+        captured: dict = {}
+
+        async def fake_run_with_pet(fn, lifespan_state, tool, **kw):
+            captured.update(kw)
+            return {"success": True, "output": ""}
+
+        monkeypatch.setattr(srv, "_run_with_pet", fake_run_with_pet)
+
+        lifespan_state = {"pet_timeout": 30.0}
+        await run_notations(
+            statement="forall n : nat, n = n",
+            preamble="",
+            workspace=str(tmp_path),
+            lifespan_state=lifespan_state,
+        )
+        assert captured.get("timeout") is None

@@ -188,3 +188,65 @@ class TestTocPathTraversal:
         )
         assert result["success"] is False
         assert "workspace" in result["error"].lower()
+
+
+# ---------------------------------------------------------------------------
+# TestTocTimeoutForwarding: per-call timeout reaches _run_with_pet
+# ---------------------------------------------------------------------------
+
+import pytest as _pytest
+
+
+class TestTocTimeoutForwarding:
+    """Per-call ``timeout`` is plumbed from run_toc to _run_with_pet."""
+
+    @_pytest.mark.asyncio
+    async def test_run_toc_forwards_timeout(self, monkeypatch, tmp_path):
+        """run_toc(timeout=X) forwards X to _run_with_pet."""
+        import rocq_mcp.server as srv
+        from rocq_mcp.interactive import run_toc
+
+        vfile = tmp_path / "t.v"
+        vfile.write_text("Theorem t : True. Proof. exact I. Qed.\n")
+        captured: dict = {}
+
+        async def fake_run_with_pet(fn, lifespan_state, tool, **kw):
+            captured.update(kw)
+            captured["tool"] = tool
+            return {"success": True, "output": ""}
+
+        monkeypatch.setattr(srv, "_run_with_pet", fake_run_with_pet)
+
+        lifespan_state = {"pet_timeout": 30.0}
+        await run_toc(
+            file=str(vfile),
+            workspace=str(tmp_path),
+            lifespan_state=lifespan_state,
+            timeout=120.0,
+        )
+        assert captured["tool"] == "rocq_toc"
+        assert captured["timeout"] == 120.0
+
+    @_pytest.mark.asyncio
+    async def test_run_toc_default_timeout_is_none(self, monkeypatch, tmp_path):
+        """Without explicit timeout, run_toc forwards None (server default)."""
+        import rocq_mcp.server as srv
+        from rocq_mcp.interactive import run_toc
+
+        vfile = tmp_path / "t.v"
+        vfile.write_text("Theorem t : True. Proof. exact I. Qed.\n")
+        captured: dict = {}
+
+        async def fake_run_with_pet(fn, lifespan_state, tool, **kw):
+            captured.update(kw)
+            return {"success": True, "output": ""}
+
+        monkeypatch.setattr(srv, "_run_with_pet", fake_run_with_pet)
+
+        lifespan_state = {"pet_timeout": 30.0}
+        await run_toc(
+            file=str(vfile),
+            workspace=str(tmp_path),
+            lifespan_state=lifespan_state,
+        )
+        assert captured.get("timeout") is None

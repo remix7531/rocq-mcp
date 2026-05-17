@@ -1563,6 +1563,7 @@ async def rocq_assumptions(
     name: str,
     file: str,
     workspace: str = "",
+    timeout: int = 0,
     ctx: Context = None,
 ) -> dict[str, Any]:
     """List the axioms a theorem depends on.
@@ -1585,6 +1586,11 @@ async def rocq_assumptions(
             up from *file* looking for ``_RocqProject`` / ``_CoqProject`` /
             ``dune-project``; falls back to the ``ROCQ_WORKSPACE`` env var
             (default: cwd).
+        timeout: Per-call timeout in seconds for the underlying
+            ``Print Assumptions`` query (which loads the file's full
+            import chain).  Default 0 uses ``ROCQ_PET_TIMEOUT`` (env
+            var, default 30).  Raise this for files with heavy import
+            chains.
 
     Returns (key fields):
         success:     bool.
@@ -1632,6 +1638,7 @@ async def rocq_assumptions(
         file=file,
         workspace=workspace,
         lifespan_state=ctx.lifespan_context,
+        timeout=float(timeout) if timeout and timeout > 0 else None,
     )
 
 
@@ -1644,6 +1651,7 @@ async def rocq_assumptions(
 async def rocq_toc(
     file: str,
     workspace: str = "",
+    timeout: int = 0,
     ctx: Context = None,
 ) -> dict[str, Any]:
     """Get the structure of a Rocq file: all definitions, lemmas, theorems, and sections.
@@ -1660,6 +1668,10 @@ async def rocq_toc(
             up from *file* looking for ``_RocqProject`` / ``_CoqProject`` /
             ``dune-project``; falls back to the ``ROCQ_WORKSPACE`` env var
             (default: cwd).
+        timeout: Per-call timeout in seconds for computing the table of
+            contents (which loads the file's full import chain).  Default
+            0 uses ``ROCQ_PET_TIMEOUT`` (env var, default 30).  Raise this
+            for files with heavy import chains.
 
     On ``pet_restarted: True``, call ``rocq_diag`` for memory headroom and
     recent error history.
@@ -1683,6 +1695,7 @@ async def rocq_toc(
         file=file,
         workspace=workspace,
         lifespan_state=ctx.lifespan_context,
+        timeout=float(timeout) if timeout and timeout > 0 else None,
     )
 
 
@@ -1696,6 +1709,7 @@ async def rocq_notations(
     statement: str,
     preamble: str = "",
     workspace: str = "",
+    timeout: int = 0,
     ctx: Context = None,
 ) -> dict[str, Any]:
     """List all notations in a Rocq statement and how they resolve.
@@ -1713,6 +1727,11 @@ async def rocq_notations(
         statement: The proposition/type to analyze.
         preamble: Import lines for context (e.g., "Require Import QArith.").
         workspace: Workspace directory (default: ROCQ_WORKSPACE env var).
+        timeout: Per-call timeout in seconds for the dummy-lemma pet
+            session used to resolve notations (which loads the preamble's
+            full import chain).  Default 0 uses ``ROCQ_PET_TIMEOUT`` (env
+            var, default 30).  Raise this for preambles with heavy import
+            chains.
 
     On ``pet_restarted: True``, call ``rocq_diag`` for memory headroom and
     recent error history.
@@ -1737,6 +1756,7 @@ async def rocq_notations(
         preamble=preamble,
         workspace=workspace,
         lifespan_state=ctx.lifespan_context,
+        timeout=float(timeout) if timeout and timeout > 0 else None,
     )
 
 
