@@ -49,6 +49,114 @@ _MAX_ERROR_LENGTH: int = 4000
 _MAX_FORMAT_WARNINGS: int = 3
 _PROOF_FILE_LABEL: str = "<proof>"
 
+# Cap on stale_dependencies list size — keeps responses bounded on large repos.
+_STALE_SCAN_LIMIT: int = 50
+
+# Directory names pruned by the stale-vo mtime sweep.  Skipping build output
+# trees (``_build``, ``.lake``) avoids flagging vendored / generated sources,
+# and ``.git`` / ``node_modules`` are obvious noise on any real project.
+_STALE_SCAN_PRUNE_DIRS: frozenset[str] = frozenset(
+    {".git", "_build", ".lake", "node_modules", "__pycache__"}
+)
+
+
+def _scan_stale_vo(workspace_root: Path, limit: int = _STALE_SCAN_LIMIT) -> tuple[list[Path], bool]:
+    """Sweep *workspace_root* for ``.v`` files whose sibling ``.vo`` is older.
+
+    Returns ``(stale_paths, truncated)`` where:
+    - *stale_paths* is a list of absolute ``Path`` objects, at most *limit* long,
+      one per ``.v`` that has a ``.vo`` next to it with an older mtime.
+    - *truncated* is True when the underlying sweep would have produced more
+      than *limit* entries.
+
+    The scan is intentionally broad and uses an mtime comparison only — no
+    ``Require``-graph traversal.  Hidden directories (``.foo``) and build
+    output trees (see ``_STALE_SCAN_PRUNE_DIRS``) are pruned during the walk
+    so monorepos don't pay for vendor-tree traversal.
+
+    Silently ignores ``OSError`` on individual ``stat`` calls so a transient
+    permission error in one corner of the tree doesn't sink the whole report.
+    """
+    stale: list[Path] = []
+    truncated = False
+    root_str = str(workspace_root)
+    for dirpath, dirnames, filenames in os.walk(root_str, topdown=True):
+        # Prune in place — required for topdown=True to actually skip subtrees.
+        dirnames[:] = [
+            d for d in dirnames
+            if not d.startswith(".") and d not in _STALE_SCAN_PRUNE_DIRS
+        ]
+        for fn in filenames:
+            if not fn.endswith(".v"):
+                continue
+            v_path = Path(dirpath) / fn
+            vo_path = v_path.with_suffix(".vo")
+            try:
+                vo_mtime = vo_path.stat().st_mtime
+            except OSError:
+                continue  # no .vo, or unreadable — not stale by our definition
+            try:
+                v_mtime = v_path.stat().st_mtime
+            except OSError:
+                continue
+            if v_mtime > vo_mtime:
+                if len(stale) >= limit:
+                    truncated = True
+                    return stale, truncated
+                stale.append(v_path)
+    return stale, truncated
+
+
+def _build_stale_dependencies_field(
+    workspace: str, target_file: str | None = None
+) -> dict[str, Any] | None:
+    """Build the ``stale_dependencies`` envelope fragment for *workspace*.
+
+    Returns a dict with ``files``, ``count``, ``truncated``, and ``advisory``
+    keys when at least one stale ``.v``/``.vo`` pair was found, otherwise
+    ``None`` (so the caller can avoid adding the field when there's nothing
+    to report).
+
+    *target_file*, if given, is excluded from the result — the file being
+    compiled right now will naturally be newer than its (about-to-be-rebuilt)
+    ``.vo``, and surfacing it would be noisy.
+    """
+    ws = Path(workspace).resolve()
+    try:
+        stale_paths, truncated = _scan_stale_vo(ws)
+    except OSError:
+        return None
+    target_resolved: Path | None = None
+    if target_file is not None:
+        try:
+            target_resolved = Path(target_file).resolve()
+        except OSError:
+            target_resolved = None
+    rel_files: list[str] = []
+    for p in stale_paths:
+        if target_resolved is not None and p == target_resolved:
+            continue
+        try:
+            rel_files.append(str(p.relative_to(ws)))
+        except ValueError:
+            rel_files.append(str(p))
+    if not rel_files:
+        return None
+    advisory = (
+        f"{len(rel_files)} source file"
+        f"{'s' if len(rel_files) != 1 else ''} "
+        f"{'are' if len(rel_files) != 1 else 'is'} newer than "
+        f"{'their' if len(rel_files) != 1 else 'its'} compiled .vo — "
+        "run `make` (or your project's build command) to rebuild before "
+        "trusting this result."
+    )
+    return {
+        "files": rel_files,
+        "count": len(rel_files),
+        "truncated": truncated,
+        "advisory": advisory,
+    }
+
 
 # ---------------------------------------------------------------------------
 # coqc runner
@@ -515,7 +623,7 @@ def run_compile_file(
         return {"success": False, "reason": "validation", "error": forbidden}
 
     result = _run_coqc_file(file_path, workspace, timeout)
-    return _build_compile_result(
+    envelope = _build_compile_result(
         result,
         source,
         timeout,
@@ -523,6 +631,13 @@ def run_compile_file(
         file_label=file,
         clean_tmp_paths=False,
     )
+    # Surface stale .v/.vo pairs regardless of compile outcome — the agent
+    # should learn about stale transitive deps even when the target itself
+    # compiled cleanly (coqc happily reuses pre-existing stale .vo files).
+    stale = _build_stale_dependencies_field(workspace, target_file=file_path)
+    if stale is not None:
+        envelope["stale_dependencies"] = stale
+    return envelope
 
 
 # ---------------------------------------------------------------------------
