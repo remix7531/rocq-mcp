@@ -1405,6 +1405,7 @@ async def run_start(
     character: int | None = None,
     preamble: str = "",
     force_restart: bool = False,
+    timeout: float | None = None,
 ) -> dict[str, Any]:
     """Open a proof context and return a state_id.
 
@@ -1493,6 +1494,7 @@ async def run_start(
         _execute,
         lifespan_state,
         "rocq_start",
+        timeout=timeout,
     )
 
 
@@ -1784,6 +1786,7 @@ async def run_step_multi(
     from_state: int | None = None,
     *,
     include_warnings: bool = True,
+    timeout: float | None = None,
 ) -> dict[str, Any]:
     """Core implementation of rocq_step_multi (testable without FastMCP Context).
 
@@ -1813,8 +1816,14 @@ async def run_step_multi(
                 f"Forbidden in tactic {tac!r}: {forbidden}",
             )
 
-    timeout: float = lifespan_state["pet_timeout"]
-    hard_timeout = _compute_hard_timeout(timeout)
+    effective_timeout: float = (
+        timeout if timeout is not None and timeout > 0
+        else lifespan_state["pet_timeout"]
+    )
+    hard_timeout = _compute_hard_timeout(effective_timeout)
+    # Rebind so the rest of the function (per-tactic budget) uses the
+    # per-call value rather than the session default.
+    timeout = effective_timeout
 
     # Quick pre-check to avoid acquiring lock for invalid states.
     # Re-validated inside _execute (state may be invalidated between checks).
