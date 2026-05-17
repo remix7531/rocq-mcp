@@ -1866,6 +1866,7 @@ async def rocq_step_multi(
     from_state: int | None = None,
     include_warnings: bool = True,
     timeout: int = 0,
+    timeouts: list[float] | None = None,
     ctx: Context = None,
 ) -> dict[str, Any]:
     """Try multiple tactics at once — find what works without guessing.
@@ -1910,12 +1911,21 @@ async def rocq_step_multi(
             tactic.
         include_warnings: If True (default), per-tactic ``feedback`` includes
             all severities.  If False, drop entries at LSP Warning severity.
-        timeout: Per-call timeout in seconds for the whole batch.  The
-            per-tactic budget is ``timeout / len(tactics)`` (subject to the
-            usual ``Timeout`` eligibility rules).  Default 0 uses
-            ``ROCQ_PET_TIMEOUT`` (env var, default 30).  Raise this when
-            individual tactics in the batch are expensive (e.g. VST
-            ``forward``/``entailer!``).
+        timeout: Per-call scalar timeout in seconds for the whole batch.
+            The per-tactic budget is ``timeout / len(tactics)``.  Default 0
+            uses ``ROCQ_PET_TIMEOUT`` (env var, default 30).  Overridden
+            per-tactic by ``timeouts`` if both are supplied.
+        timeouts: Optional list of per-tactic Rocq timeouts in seconds.  If
+            provided, its length must equal ``len(tactics)`` and each value
+            is used as the Rocq-level ``Timeout`` budget for the matching
+            entry (clamped to a minimum of 1 second; non-eligible tactics
+            still get ``None``).  Takes precedence over ``timeout`` for
+            per-tactic budgeting; the outer asyncio watchdog widens to
+            ``sum(timeouts)``.
+
+    Each entry in the returned ``results`` list carries a ``time_ms``
+    field — a non-negative integer of wall-clock milliseconds spent in
+    the underlying tactic call.
 
     On ``pet_restarted: True``, call ``rocq_diag`` for memory headroom and
     recent error history.
@@ -1933,6 +1943,7 @@ async def rocq_step_multi(
         from_state=from_state,
         include_warnings=include_warnings,
         timeout=float(timeout) if timeout and timeout > 0 else None,
+        timeouts=timeouts,
     )
 
 

@@ -1027,3 +1027,192 @@ class TestStepMultiTimeoutForwarding:
             assert captured["timeout"] == 45.0 + _PET_TIMEOUT_GRACE
         finally:
             _state_table.clear()
+
+
+# ---------------------------------------------------------------------------
+# TestStepMultiExplicitTimeouts: per-tactic timeouts list
+# ---------------------------------------------------------------------------
+
+
+class TestStepMultiExplicitTimeouts:
+    """Tests for the optional ``timeouts: list[float] | None`` parameter."""
+
+    @pytest.fixture(autouse=True)
+    def _reset_state_and_semaphore(self):
+        import rocq_mcp.server as srv
+        from rocq_mcp.interactive import _state_invalidate_all
+
+        _state_invalidate_all()
+        srv._pet_semaphore = None
+        yield
+        _state_invalidate_all()
+        srv._pet_semaphore = None
+
+    @pytest.fixture(autouse=True)
+    def _mock_pytanque(self):
+        cleanup = _ensure_pytanque_importable()
+        yield
+        cleanup()
+
+    def test_timeouts_length_mismatch_returns_error(self):
+        """timeouts list with wrong length is rejected up front."""
+        from rocq_mcp.interactive import run_step_multi
+
+        lifespan_state = {"pet_client": None, "pet_timeout": 30.0}
+        result = asyncio.run(
+            run_step_multi(
+                tactics=["auto.", "lia."],
+                lifespan_state=lifespan_state,
+                timeouts=[5.0, 10.0, 15.0],
+            )
+        )
+        assert result["success"] is False
+        assert "timeouts length 3" in result["error"]
+        assert "tactics length 2" in result["error"]
+        assert result.get("reason") == "validation"
+
+    def test_explicit_timeouts_used_per_tactic(self):
+        """Each tactic gets its own budget from the timeouts list."""
+        from rocq_mcp.interactive import run_step_multi
+        from rocq_mcp.interactive import _state_add
+
+        recorded_timeouts = []
+
+        parent_state = _make_mock_state(proof_finished=False)
+        injected_id = _state_add(
+            state=parent_state,
+            file="test.v",
+            theorem="t",
+            workspace="/tmp",
+            parent_id=None,
+            tactic=None,
+            step=0,
+        )
+
+        mock_pet = MagicMock()
+        new_state = _make_mock_state(proof_finished=False)
+
+        def fake_run(state, tac, timeout=None):
+            recorded_timeouts.append(timeout)
+            return new_state
+
+        mock_pet.run = fake_run
+        mock_pet.complete_goals = MagicMock(
+            return_value=_make_complete_goals(goals=[])
+        )
+
+        lifespan_state = {
+            "pet_client": None,
+            "pet_timeout": 30.0,
+            "current_workspace": "/tmp",
+        }
+
+        with (
+            patch("rocq_mcp.server._ensure_pet", return_value=mock_pet),
+            patch("rocq_mcp.server._set_workspace_if_needed"),
+        ):
+            result = asyncio.run(
+                run_step_multi(
+                    tactics=["lia.", "nia.", "entailer!."],
+                    lifespan_state=lifespan_state,
+                    from_state=injected_id,
+                    timeouts=[2.0, 20.0, 40.0],
+                )
+            )
+
+        assert result["success"] is True
+        # Per-tactic budgets are preserved (not divided).
+        assert recorded_timeouts == [2, 20, 40]
+
+    def test_results_have_time_ms_nonneg_int(self):
+        """Every per-tactic entry carries a non-negative int ``time_ms``."""
+        from rocq_mcp.interactive import run_step_multi
+        from rocq_mcp.interactive import _state_add
+
+        parent_state = _make_mock_state(proof_finished=False)
+        injected_id = _state_add(
+            state=parent_state,
+            file="test.v",
+            theorem="t",
+            workspace="/tmp",
+            parent_id=None,
+            tactic=None,
+            step=0,
+        )
+
+        mock_pet = MagicMock()
+        new_state = _make_mock_state(proof_finished=False)
+        mock_pet.run = MagicMock(return_value=new_state)
+        mock_pet.complete_goals = MagicMock(
+            return_value=_make_complete_goals(goals=[])
+        )
+
+        lifespan_state = {
+            "pet_client": None,
+            "pet_timeout": 30.0,
+            "current_workspace": "/tmp",
+        }
+
+        with (
+            patch("rocq_mcp.server._ensure_pet", return_value=mock_pet),
+            patch("rocq_mcp.server._set_workspace_if_needed"),
+        ):
+            result = asyncio.run(
+                run_step_multi(
+                    tactics=["auto.", "lia.", "ring."],
+                    lifespan_state=lifespan_state,
+                    from_state=injected_id,
+                )
+            )
+
+        assert result["success"] is True
+        assert len(result["results"]) == 3
+        for entry in result["results"]:
+            assert "time_ms" in entry
+            assert isinstance(entry["time_ms"], int)
+            assert entry["time_ms"] >= 0
+
+    def test_time_ms_present_on_tactic_failure(self):
+        """``time_ms`` is present even when a tactic fails (PetanqueError)."""
+        from pytanque import PetanqueError
+        from rocq_mcp.interactive import run_step_multi, _state_add
+
+        parent_state = _make_mock_state(proof_finished=False)
+        _state_add(
+            state=parent_state,
+            file="test.v",
+            theorem="t",
+            workspace="/tmp",
+            parent_id=None,
+            tactic=None,
+            step=0,
+        )
+
+        err = PetanqueError.__new__(PetanqueError)
+        err.message = "tactic rejected"
+        mock_alive_pet = MagicMock()
+        mock_alive_pet.process = MagicMock()
+        mock_alive_pet.process.poll = MagicMock(return_value=None)
+        mock_alive_pet.run = MagicMock(side_effect=err)
+
+        lifespan_state = {
+            "pet_client": mock_alive_pet,
+            "pet_timeout": 30.0,
+            "current_workspace": "/tmp",
+        }
+
+        with patch("rocq_mcp.server._ensure_pet", return_value=mock_alive_pet):
+            result = asyncio.run(
+                run_step_multi(
+                    tactics=["bad_tac."],
+                    lifespan_state=lifespan_state,
+                )
+            )
+
+        assert result["success"] is True
+        assert len(result["results"]) == 1
+        entry = result["results"][0]
+        assert entry["success"] is False
+        assert "time_ms" in entry
+        assert isinstance(entry["time_ms"], int)
+        assert entry["time_ms"] >= 0
