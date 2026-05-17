@@ -1205,7 +1205,10 @@ class TestReconstructTacticPath:
         from rocq_mcp.interactive import _reconstruct_tactic_path
 
         tactics, complete = _reconstruct_tactic_path(9999)
-        assert tactics == []
+        # Sentinel prepended because chain is incomplete (state doesn't exist).
+        assert len(tactics) == 1
+        assert tactics[0].startswith("(* ... earlier tactics lost")
+        assert "9999" in tactics[0]
         assert complete is False
 
     def test_broken_chain_returns_partial(self):
@@ -1223,7 +1226,10 @@ class TestReconstructTacticPath:
         del _state_table[s1]
         # Only s2 survives — chain is broken
         tactics, complete = _reconstruct_tactic_path(s2)
-        assert tactics == ["auto."]
+        # Sentinel is prepended to surface truncation.
+        assert tactics[0].startswith("(* ... earlier tactics lost")
+        assert str(s1) in tactics[0]
+        assert tactics[1:] == ["auto."]
         assert complete is False
 
     def test_cycle_detection(self):
@@ -1268,6 +1274,37 @@ class TestReconstructTacticPath:
         assert complete is False
         # Should still have the tactics from surviving states
         assert "auto." in tactics
+
+    def test_broken_chain_sentinel_at_index_zero(self):
+        """Broken chain prefixes a Coq-comment sentinel at index 0.
+
+        This guards against UI clients that ignore proof_tactics_complete=False —
+        the sentinel makes the truncation visible in-band, and uses (* ... *)
+        syntax so naive concatenation into a .v file stays well-formed.
+        """
+        from rocq_mcp.interactive import (
+            _reconstruct_tactic_path,
+            _state_table,
+        )
+
+        root = add_mock_state(None, None, step=0)
+        s1 = add_mock_state(root, "intros.", step=1)
+        s2 = add_mock_state(s1, "induction n.", step=2)
+        s3 = add_mock_state(s2, "reflexivity.", step=3)
+        # Evict an ancestor (s1) to break the chain.
+        del _state_table[s1]
+
+        tactics, complete = _reconstruct_tactic_path(s3)
+        assert complete is False
+        assert len(tactics) >= 1
+        sentinel = tactics[0]
+        assert sentinel.startswith("(*")
+        assert sentinel.endswith("*)")
+        assert "chain broken at state" in sentinel
+        # Broken-at id should be the missing ancestor (s1).
+        assert str(s1) in sentinel
+        # Surviving tactics still present after the sentinel.
+        assert "reflexivity." in tactics
 
 
 # =========================================================================

@@ -442,18 +442,26 @@ def _reconstruct_tactic_path(state_id: int) -> tuple[list[str], bool]:
     tactics: list[str] = []
     current_id: int | None = state_id
     visited: set[int] = set()
+    broken_at: int | None = None
     while current_id is not None:
         if current_id in visited:
-            break  # cycle detected
+            broken_at = current_id  # cycle detected
+            break
         visited.add(current_id)
         entry = _state_get(current_id)
         if entry is None:
-            break  # chain broken by eviction
+            broken_at = current_id  # chain broken by eviction
+            break
         if entry.tactic is not None:
             tactics.append(entry.tactic)
         current_id = entry.parent_id
     tactics.reverse()
     complete = current_id is None  # True only if we reached root (parent_id=None)
+    if not complete:
+        sentinel = (
+            f"(* ... earlier tactics lost — chain broken at state {broken_at} *)"
+        )
+        tactics.insert(0, sentinel)
     return tactics, complete
 
 
