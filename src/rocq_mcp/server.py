@@ -1918,6 +1918,13 @@ async def rocq_compile_file(
     when the per-call timeout was clamped by ``ROCQ_QUERY_TIMEOUT_CAP``;
     ``timing`` when ``timing=True``.
 
+    Returns:
+        Standard compile envelope (``success`` / ``error`` / ``reason``
+        / ``error_positions`` / ``hint`` / ``state_capture_status`` as
+        described above), plus the optional additive fields noted in the
+        preceding paragraph (``errors``, ``vo_rebuild_warning``,
+        ``clamped_timeout``, ``timing``) when their conditions are met.
+
     On ``pet_restarted: True`` (state-capture path crashed pet), call
     ``rocq_diag`` for memory headroom and recent error history.
     """
@@ -2272,6 +2279,17 @@ async def rocq_toc(
             when clamping fires the response includes ``clamped_timeout:
             <cap>`` so the caller can diagnose unexpected timeouts.
 
+    Returns:
+        On success, a dict with ``success: True`` and ``output`` (str)
+        — an indented text outline.  The first line is ``File:
+        <file>``; each declaration follows on its own line as
+        ``<detail> <name> (line N)`` (where ``detail`` is the kind,
+        e.g. ``Theorem`` / ``Definition`` / ``Inductive`` / ``Section``
+        / ``Module``, and ``N`` is the 0-based start line).  Sections
+        and modules nest their contained declarations with deeper
+        indentation.  An empty file yields ``"File: <file>\\n
+        (empty)"``.
+
     On ``pet_restarted: True``, call ``rocq_diag`` for memory headroom and
     recent error history.
     """
@@ -2326,6 +2344,16 @@ async def rocq_notations(
             stray large value cannot park the pet lock indefinitely;
             when clamping fires the response includes ``clamped_timeout:
             <cap>`` so the caller can diagnose unexpected timeouts.
+
+    Returns:
+        On success, a dict with ``success: True`` and ``output`` (str)
+        — a pretty-printed listing with one line per notation token
+        found in ``statement``, formatted as
+        ``"<notation>"  ->  <module>  (scope: <scope>)`` (the scope
+        suffix is omitted when the notation has no associated scope,
+        and the module falls back to ``"unknown"`` when provenance
+        cannot be determined).  When the statement contains no
+        notations, ``output`` is ``"No notations found in statement."``.
 
     On ``pet_restarted: True``, call ``rocq_diag`` for memory headroom and
     recent error history.
@@ -2546,6 +2574,24 @@ async def rocq_step_multi(
             ``clamped_timeout: <cap>`` so the caller can diagnose
             unexpected timeouts.
 
+    Returns:
+        On success, ``success: True`` and a ``results: list[dict]``
+        with one entry per input tactic, preserving order.  Each entry
+        carries at least:
+
+        - ``tactic`` (str) — the input tactic.
+        - ``success`` (bool) — whether the tactic was accepted from
+          the base state.
+        - ``goals`` (str, on success) — pretty-printed open goals
+          after the tactic (``"No goals remaining."`` when none).
+          ``rocq_step_multi`` is read-only: it does not advance the
+          current state, so commit the winner with ``rocq_check``.
+        - ``proof_finished`` (bool, on success) — True iff the tactic
+          closed the proof.
+        - ``error`` / ``reason`` (str, on failure) — typically
+          ``reason: "tactic_failed"``.
+        - ``feedback`` (str, optional) — truncated visible output.
+
     On ``pet_restarted: True``, call ``rocq_diag`` for memory headroom and
     recent error history.
     """
@@ -2638,6 +2684,45 @@ async def rocq_check(
             unexpected timeouts.
         include_warnings: If True (default), per-step ``feedback`` includes
             all severities.  If False, drop entries at LSP Warning severity.
+
+    Returns:
+        On success, a dict with ``success: True`` and the standard
+        interactive payload:
+
+        - ``state_id`` (int) — the new current state after running
+          ``body``.  Use as ``from_state`` for the next call.
+        - ``goals`` (str) — pretty-printed open goals at ``state_id``;
+          empty when ``proof_finished`` is True.
+        - ``proof_finished`` (bool) — True iff the proof closed.
+        - ``commands_run`` (int) — number of sentences executed.
+        - ``feedback`` (list[[str, str]], optional) — per-command
+          visible output, omitted when no command produced any.
+        - ``stale_warning`` (str, optional) — the backing ``.v`` file
+          was modified on disk after ``rocq_start``.
+
+        When ``proof_finished`` is True and the tactic chain was
+        reconstructed successfully:
+
+        - ``proof_tactics`` (list[str]) — root-to-current tactic chain.
+        - ``proof_hint`` (str) — instructions for assembling a final
+          ``.v`` file.
+
+        When ``proof_finished`` is True but the walk could not complete
+        (an ancestor state was LRU-evicted, or a cycle was detected),
+        ``proof_tactics`` and ``proof_hint`` are omitted and instead the
+        response carries ``proof_tactics_status``
+        (``"ancestor_evicted"`` or ``"cycle"``),
+        ``proof_tactics_broken_at`` (the state id where the walk gave
+        up), and ``proof_tactics_hint`` — so clients that ignore these
+        keys never render a partial walk as a finished proof.
+
+        On failure, in addition to ``success: False`` / ``error`` /
+        ``reason``, the response includes:
+
+        - ``last_valid_state_id`` (int, optional) — the most recent
+          successful state in the batch; recover via
+          ``rocq_check(from_state=...)`` or
+          ``rocq_step_multi(from_state=...)``.
 
     On ``pet_restarted: True``, call ``rocq_diag`` for memory headroom and
     recent error history.
