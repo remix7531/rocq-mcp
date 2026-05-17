@@ -1183,6 +1183,8 @@ from rocq_mcp.compile import (  # noqa: E402
 )
 from rocq_mcp.interactive import (  # noqa: E402
     run_assumptions,
+    run_goal_at,
+    run_hover,
     run_query,
     run_start,
     run_check,
@@ -2031,6 +2033,145 @@ async def rocq_check(
         lifespan_state=ctx.lifespan_context,
         from_state=from_state,
         include_warnings=include_warnings,
+    )
+
+
+@mcp.tool
+async def rocq_goal_at(
+    file: str,
+    line: int,
+    character: int,
+    workspace: str = "",
+    timeout: int = 0,
+    ctx: Context = None,
+) -> dict[str, Any]:
+    """Inspect proof goals at a file position — stateless, no session created.
+
+    File-anchored read tool. Returns the current proof goals at
+    ``(file, line, character)`` without registering a ``state_id`` in
+    the LRU state table.  Use this when you only need to PEEK at goals
+    at a particular spot; reach for ``rocq_start`` (and the rest of the
+    interactive proof workflow) only when you actually intend to take
+    proof steps.
+
+    The response is shaped like a ``rocq_check`` success payload minus
+    any ``state_id`` field, plus:
+
+    - ``stateless: True`` — no session was created
+    - ``at_proof`` — ``True`` when the position is inside an open proof
+      with remaining goals; ``False`` between definitions / in vernac
+    - ``goals`` — formatted goal text (empty when ``at_proof`` is False)
+
+    Args:
+        file: Path to the .v file (relative to workspace).
+        line: 0-based line number.
+        character: 0-based character offset.
+        workspace: Workspace directory.  If omitted, auto-detected.
+        timeout: Per-call timeout in seconds.  ``0`` (default) means use
+            ``ROCQ_PET_TIMEOUT``.
+    """
+    workspace = workspace or _find_project_root_from_file(file) or ROCQ_WORKSPACE
+
+    err = _validate_workspace(workspace)
+    if err:
+        return _fail(
+            ctx.lifespan_context if ctx else None,
+            "rocq_goal_at",
+            err,
+            "validation",
+        )
+
+    if ctx is None:
+        return {
+            "success": False,
+            "reason": "validation",
+            "error": "Internal error: no MCP context.",
+        }
+
+    effective_timeout: float | None = float(timeout) if timeout and timeout > 0 else None
+
+    return await run_goal_at(
+        file=file,
+        line=line,
+        character=character,
+        workspace=workspace,
+        lifespan_state=ctx.lifespan_context,
+        timeout=effective_timeout,
+    )
+
+
+@mcp.tool
+async def rocq_hover(
+    file: str,
+    line: int,
+    character: int,
+    workspace: str = "",
+    timeout: int = 0,
+    ctx: Context = None,
+) -> dict[str, Any]:
+    """Symbol info at a file position — type, kind, location. Stateless.
+
+    File-anchored read tool. Returns best-effort information about the
+    identifier at ``(file, line, character)``: name, type signature,
+    kind (Constant, Inductive, Notation, ...), and qualified name.  No
+    ``state_id`` is registered.  Use this to quickly inspect a symbol
+    without going through ``rocq_query`` and parsing ``About`` output
+    yourself; reach for ``rocq_start`` only when you intend to do
+    interactive proof work.
+
+    Implementation: pytanque speaks the petanque JSON-RPC subset of
+    coq-lsp, which does NOT expose an LSP ``textDocument/hover`` method.
+    This tool composes ``ast_at_pos`` + a transient ``get_state_at_pos``
+    state + ``Locate`` / ``About`` vernac commands to synthesise hover
+    info.  The resulting fields are best-effort — for full detail call
+    ``rocq_query`` with ``Print`` / ``About`` directly.
+
+    Response fields (all may be ``None`` when extraction fails):
+
+    - ``found`` — whether an identifier was resolved at the position
+    - ``name`` — the identifier as it appears at the cursor
+    - ``qualified_name`` — fully-qualified name from ``Locate``
+    - ``kind`` — Coq kind ("Constant", "Inductive", "Notation", ...)
+    - ``type`` — type signature extracted from ``About``
+    - ``definition_file`` — best-effort module path from qualified name
+    - ``raw_about`` / ``raw_locate`` — full vernac output (truncated)
+    - ``stateless: True``
+
+    Args:
+        file: Path to the .v file (relative to workspace).
+        line: 0-based line number.
+        character: 0-based character offset.
+        workspace: Workspace directory.  If omitted, auto-detected.
+        timeout: Per-call timeout in seconds.  ``0`` (default) means use
+            ``ROCQ_PET_TIMEOUT``.
+    """
+    workspace = workspace or _find_project_root_from_file(file) or ROCQ_WORKSPACE
+
+    err = _validate_workspace(workspace)
+    if err:
+        return _fail(
+            ctx.lifespan_context if ctx else None,
+            "rocq_hover",
+            err,
+            "validation",
+        )
+
+    if ctx is None:
+        return {
+            "success": False,
+            "reason": "validation",
+            "error": "Internal error: no MCP context.",
+        }
+
+    effective_timeout: float | None = float(timeout) if timeout and timeout > 0 else None
+
+    return await run_hover(
+        file=file,
+        line=line,
+        character=character,
+        workspace=workspace,
+        lifespan_state=ctx.lifespan_context,
+        timeout=effective_timeout,
     )
 
 

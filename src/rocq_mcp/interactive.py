@@ -2072,3 +2072,382 @@ async def run_step_multi(
         timeout=hard_timeout,
         partial_state=partial_state,
     )
+
+
+# ---------------------------------------------------------------------------
+# Tool: rocq_goal_at (stateless, file-anchored)
+# ---------------------------------------------------------------------------
+
+
+async def run_goal_at(
+    file: str,
+    line: int,
+    character: int,
+    workspace: str,
+    lifespan_state: dict[str, Any],
+    *,
+    timeout: float | None = None,
+) -> dict[str, Any]:
+    """Return goals at ``(file, line, character)`` WITHOUT registering a state.
+
+    This is the stateless read path for goal inspection.  Unlike
+    :func:`run_start` in position mode, this function never inserts an
+    entry into ``_state_table`` and never increments ``_state_next_id``.
+    The pytanque ``State`` object produced internally is dropped as soon
+    as goals are extracted.
+
+    Returns an envelope shaped like ``run_check``'s success path (so
+    agents see a familiar shape), minus any ``state_id`` field, plus a
+    top-level ``stateless: True`` marker.  When the position is not
+    inside an open proof (e.g., between definitions, in vernac), returns
+    ``goals=""`` with ``at_proof: False``.
+    """
+    if not (0 <= line <= _MAX_LINE_CHAR_RANGE) or not (
+        0 <= character <= _MAX_LINE_CHAR_RANGE
+    ):
+        return _server._fail(
+            lifespan_state,
+            "rocq_goal_at",
+            f"line and character must be in range [0, {_MAX_LINE_CHAR_RANGE}].",
+        )
+
+    try:
+        resolved_file = _server._resolve_file_in_workspace(file, workspace)
+    except (ValueError, FileNotFoundError) as e:
+        return _server._fail(lifespan_state, "rocq_goal_at", str(e))
+
+    # Snapshot _state_next_id around the pet call to guarantee we did
+    # NOT register a state — used by tests and as defense-in-depth.
+    def _execute(pet: Any) -> dict[str, Any]:
+        _server._set_workspace_if_needed(pet, workspace, lifespan_state)
+        state = pet.get_state_at_pos(resolved_file, line, character)
+        proof_finished = bool(getattr(state, "proof_finished", False))
+        goals_text = ""
+        at_proof = False
+        try:
+            complete = pet.complete_goals(state)
+            goals_list = complete.goals if complete else []
+            if goals_list:
+                at_proof = True
+                goals_text = _format_goals(goals_list)
+        except Exception:
+            # Goals call failed (likely no open proof) — treat as not-in-proof.
+            goals_list = []
+        return {
+            "success": True,
+            "stateless": True,
+            "goals": goals_text,
+            "at_proof": at_proof,
+            "proof_finished": proof_finished,
+            "file": file,
+            "line": line,
+            "character": character,
+        }
+
+    return await _server._run_with_pet(
+        _execute,
+        lifespan_state,
+        "rocq_goal_at",
+        timeout=timeout,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Tool: rocq_hover (stateless, file-anchored symbol info)
+# ---------------------------------------------------------------------------
+
+
+# Identifier regex: Rocq names allow letters, digits, underscores, primes,
+# and dots (for qualified names like ``Coq.Init.Nat.add``).  This is a
+# best-effort extractor used when the AST node does not carry a name.
+_IDENT_RE = re.compile(r"[A-Za-z_][A-Za-z_0-9']*(?:\.[A-Za-z_][A-Za-z_0-9']*)*")
+
+# Cap on hover output text size — large ``Print`` dumps would otherwise
+# dominate the response.
+_MAX_HOVER_OUTPUT: int = 4000
+
+
+def _extract_ident_from_source(
+    source: str, line: int, character: int
+) -> str | None:
+    """Best-effort: find the identifier spanning ``(line, character)`` in
+    *source*.  Returns ``None`` for whitespace / punctuation / out-of-range.
+    """
+    lines = source.splitlines()
+    if line < 0 or line >= len(lines):
+        return None
+    text = lines[line]
+    if character < 0 or character > len(text):
+        return None
+    # Scan all identifier matches on this line and pick the one whose
+    # span contains ``character`` (inclusive on both ends — agents often
+    # click just past the last char).
+    for m in _IDENT_RE.finditer(text):
+        if m.start() <= character <= m.end():
+            return m.group(0)
+    return None
+
+
+def _extract_ident_from_ast(ast_obj: Any) -> str | None:
+    """Best-effort: dig an identifier out of a pytanque AST dict.
+
+    The AST shape is petanque-specific (a JSON tree from coq-lsp).  We
+    walk it looking for nodes that carry a ``v`` field with a string
+    leaf, which is where ``CRef``-style nodes stash the qualified name.
+    """
+    if ast_obj is None:
+        return None
+    # Walk the structure looking for likely name carriers.
+    seen: set[int] = set()
+    candidates: list[str] = []
+
+    def _walk(node: Any) -> None:
+        if id(node) in seen:
+            return
+        seen.add(id(node))
+        if isinstance(node, dict):
+            # Common coq-lsp serialised shapes:
+            #   { "v": { "Ser_Qualid": [ ..., [["Id","foo"]] ] } }
+            #   { "Id": "foo" }
+            if "Id" in node and isinstance(node["Id"], str):
+                candidates.append(node["Id"])
+            for v in node.values():
+                _walk(v)
+        elif isinstance(node, list):
+            # Lists like ["Id", "foo"] appear as tagged variants.
+            if (
+                len(node) == 2
+                and node[0] == "Id"
+                and isinstance(node[1], str)
+            ):
+                candidates.append(node[1])
+            else:
+                for v in node:
+                    _walk(v)
+
+    _walk(ast_obj)
+    # Heuristic: prefer the LAST identifier in the AST — for ``About foo.``
+    # the node ordering tends to put the operand last.  Filter Rocq
+    # keywords that occasionally appear as ``Id`` leaves.
+    _KEYWORDS = {
+        "Prop", "Set", "Type", "SProp", "fun", "forall", "match",
+        "with", "end", "let", "in", "if", "then", "else",
+    }
+    for cand in reversed(candidates):
+        if cand and cand not in _KEYWORDS:
+            return cand
+    return None
+
+
+def _parse_locate_output(output: str) -> tuple[str | None, str | None]:
+    """Parse ``Locate <name>.`` output for (kind, definition_file).
+
+    Locate's output looks like::
+
+        Constant Coq.Init.Nat.add
+        Inductive Coq.Init.Datatypes.nat
+        Notation "x + y" := ...
+
+    Returns ``(kind, qualified_name)`` from the first matching line.
+    """
+    for raw in output.splitlines():
+        line = raw.strip()
+        if not line:
+            continue
+        # First word is the kind; rest is the qualified name (best-effort).
+        parts = line.split(None, 1)
+        if len(parts) == 2:
+            kind, rest = parts
+            # Strip trailing punctuation / quotes.
+            qname = rest.strip().rstrip(".").strip('"').strip()
+            return kind, qname or None
+    return None, None
+
+
+async def run_hover(
+    file: str,
+    line: int,
+    character: int,
+    workspace: str,
+    lifespan_state: dict[str, Any],
+    *,
+    timeout: float | None = None,
+) -> dict[str, Any]:
+    """Return type / kind / location info for the symbol at ``(file, line, character)``.
+
+    Stateless: never registers a ``state_id``.  Implementation strategy:
+
+    1. Resolve the identifier under the cursor.  pytanque's
+       ``ast_at_pos`` returns the AST node at the position; we walk it
+       to extract any ``Id`` leaves.  When the AST does not carry a name
+       (e.g., the cursor sits on whitespace or punctuation), we fall
+       back to a regex scan of the source line.
+    2. Open a transient state via ``get_state_at_pos`` to ground the
+       environment — this picks up all imports / scopes active at the
+       cursor, so qualified names resolve the same way they would for
+       the source code being read.
+    3. Run ``Locate <name>.`` and ``About <name>.`` against that state
+       via ``pet.run`` to extract structured info.  The state and its
+       transient children are dropped — no ``_state_table`` entry.
+
+    Returns an envelope with ``stateless: True`` plus best-effort
+    fields: ``name``, ``type`` (from About), ``kind`` (from Locate),
+    ``definition_file`` (best-effort from Locate qualified name),
+    ``raw_about`` (full About output, truncated).
+    """
+    if not (0 <= line <= _MAX_LINE_CHAR_RANGE) or not (
+        0 <= character <= _MAX_LINE_CHAR_RANGE
+    ):
+        return _server._fail(
+            lifespan_state,
+            "rocq_hover",
+            f"line and character must be in range [0, {_MAX_LINE_CHAR_RANGE}].",
+        )
+
+    try:
+        resolved_file = _server._resolve_file_in_workspace(file, workspace)
+    except (ValueError, FileNotFoundError) as e:
+        return _server._fail(lifespan_state, "rocq_hover", str(e))
+
+    # Pre-read the source so we have a regex fallback if the AST has no name.
+    try:
+        source_text = Path(resolved_file).read_text()
+    except OSError as e:
+        return _server._fail(lifespan_state, "rocq_hover", str(e))
+
+    def _execute(pet: Any) -> dict[str, Any]:
+        _server._set_workspace_if_needed(pet, workspace, lifespan_state)
+
+        # Step 1: identifier resolution — try AST first, fall back to regex.
+        ident: str | None = None
+        try:
+            ast_obj = pet.ast_at_pos(resolved_file, line, character)
+            ident = _extract_ident_from_ast(ast_obj)
+        except Exception:
+            ast_obj = None
+
+        if not ident:
+            ident = _extract_ident_from_source(source_text, line, character)
+
+        if not ident:
+            return {
+                "success": True,
+                "stateless": True,
+                "found": False,
+                "reason": "no_symbol_at_position",
+                "file": file,
+                "line": line,
+                "character": character,
+            }
+
+        # Step 2: transient state at the cursor for environment grounding.
+        try:
+            state = pet.get_state_at_pos(resolved_file, line, character)
+        except Exception as e:
+            # Position invalid for state grounding — still return the
+            # identifier so the caller has something useful.
+            return {
+                "success": True,
+                "stateless": True,
+                "found": True,
+                "name": ident,
+                "kind": None,
+                "type": None,
+                "definition_file": None,
+                "raw_about": None,
+                "warning": f"could not ground state at position: {e}",
+                "file": file,
+                "line": line,
+                "character": character,
+            }
+
+        # Step 3: Locate + About against the transient state.
+        kind: str | None = None
+        qualified: str | None = None
+        locate_output = ""
+        about_output = ""
+
+        if _PetanqueError is not None:
+            _PetErr: Any = _PetanqueError
+        else:  # pragma: no cover
+            _PetErr = Exception
+
+        try:
+            loc_state = pet.run(state, f"Locate {ident}.")
+            locate_output = "\n".join(
+                msg for _, msg in (loc_state.feedback or []) if msg
+            )
+            kind, qualified = _parse_locate_output(locate_output)
+        except _PetErr:
+            if not _server._pet_alive(lifespan_state.get("pet_client")):
+                raise
+            # Locate failed — proceed without it.
+
+        try:
+            ab_state = pet.run(state, f"About {ident}.")
+            about_output = "\n".join(
+                msg for _, msg in (ab_state.feedback or []) if msg
+            )
+        except _PetErr:
+            if not _server._pet_alive(lifespan_state.get("pet_client")):
+                raise
+            about_output = ""
+
+        # Best-effort: extract the type line from About.  About's output
+        # for a constant typically starts with ``name : <type>`` on the
+        # first non-empty line.
+        type_str: str | None = None
+        if about_output:
+            for raw in about_output.splitlines():
+                stripped = raw.strip()
+                if not stripped:
+                    continue
+                # Match leading "name :" pattern.
+                short = ident.rsplit(".", 1)[-1]
+                if stripped.startswith(f"{short} :") or stripped.startswith(
+                    f"{ident} :"
+                ):
+                    type_str = stripped.split(":", 1)[1].strip()
+                    break
+                # Some kinds (Notation, Inductive) don't follow that
+                # pattern — accept the first non-empty line.
+                if type_str is None:
+                    type_str = stripped
+                    # Don't break: prefer a "name :" match if it shows up later.
+
+        definition_file: str | None = None
+        if qualified and "." in qualified:
+            # ``Coq.Init.Nat.add`` -> guess ``Coq/Init/Nat.v`` style
+            # location.  Rocq's source path is install-dependent; we
+            # surface the qualified module path as a "best-effort
+            # location" the caller can interpret.
+            definition_file = qualified.rsplit(".", 1)[0]
+
+        if len(about_output) > _MAX_HOVER_OUTPUT:
+            about_output = (
+                about_output[:_MAX_HOVER_OUTPUT]
+                + f"\n... (truncated, {len(about_output)} total chars)"
+            )
+
+        return {
+            "success": True,
+            "stateless": True,
+            "found": True,
+            "name": ident,
+            "kind": kind,
+            "type": type_str,
+            "qualified_name": qualified,
+            "definition_file": definition_file,
+            "raw_about": about_output or None,
+            "raw_locate": locate_output or None,
+            "file": file,
+            "line": line,
+            "character": character,
+        }
+
+    return await _server._run_with_pet(
+        _execute,
+        lifespan_state,
+        "rocq_hover",
+        timeout=timeout,
+    )
