@@ -13,3 +13,6 @@ build/
 *.timing
 .pytest_cache/
 .venv/
+result
+result-*
+.direnv/
