@@ -1313,6 +1313,28 @@ async def rocq_compile_file(
             before the error in the output.  Set to False to get only the
             error diagnostic, which keeps context compact.
 
+    Returns:
+        Standard compile envelope (``success`` / ``error`` / ``reason``
+        / ``error_positions`` / ``hint`` / ``state_capture_status`` as
+        described above).  In addition, when one or more ``.v`` files
+        in the workspace are newer than their sibling ``.vo`` artifact,
+        the response carries an advisory ``stale_dependencies`` field
+        with shape:
+
+        - ``files`` (list[str]) — workspace-relative paths of stale
+          ``.v`` files (capped at 50 entries).
+        - ``count`` (int) — number of entries returned in ``files``.
+        - ``truncated`` (bool) — True when more stale files exist
+          than the cap.
+        - ``advisory`` (str) — short human-readable note telling the
+          agent to rebuild dependencies (e.g. via ``make``) before
+          trusting the compile.
+
+        The ``stale_dependencies`` field is surfaced on both success
+        and failure compiles, and is omitted when no staleness is
+        detected.  The file being compiled is intentionally excluded
+        from the list.
+
     On ``pet_restarted: True`` (state-capture path crashed pet), call
     ``rocq_diag`` for memory headroom and recent error history.
     """
@@ -1661,6 +1683,18 @@ async def rocq_toc(
             ``dune-project``; falls back to the ``ROCQ_WORKSPACE`` env var
             (default: cwd).
 
+    Returns:
+        On success, a dict with ``success: True`` and:
+
+        - ``toc`` (list[dict]) — ordered entries, each with at least
+          ``name`` (str), ``kind`` (str — e.g. ``"Theorem"``,
+          ``"Definition"``, ``"Inductive"``, ``"Section"``,
+          ``"Module"``), and position fields ``line`` / ``character``
+          (0-based) marking where the declaration starts.  Sections
+          and modules carry a nested ``children`` list for the
+          contained declarations.
+        - ``file`` (str) — the resolved file path.
+
     On ``pet_restarted: True``, call ``rocq_diag`` for memory headroom and
     recent error history.
     """
@@ -1713,6 +1747,24 @@ async def rocq_notations(
         statement: The proposition/type to analyze.
         preamble: Import lines for context (e.g., "Require Import QArith.").
         workspace: Workspace directory (default: ROCQ_WORKSPACE env var).
+
+    Returns:
+        On success, a dict with ``success: True`` and:
+
+        - ``notations`` (list[dict]) — one entry per notation token
+          that appears in ``statement``.  Each entry has at minimum:
+
+          - ``notation`` (str) — the surface token (e.g. ``"+"``,
+            ``"_ <= _"``).
+          - ``scope`` (str | None) — the resolved scope (e.g.
+            ``"nat_scope"``, ``"Z_scope"``).
+          - ``definition`` (str) — the underlying term the notation
+            unfolds to.
+          - ``module`` (str, optional) — the module declaring the
+            notation, when discoverable.
+
+        - ``statement`` (str) — the statement that was analyzed, after
+          any normalization.
 
     On ``pet_restarted: True``, call ``rocq_diag`` for memory headroom and
     recent error history.
@@ -1884,6 +1936,34 @@ async def rocq_step_multi(
             tactic.
         include_warnings: If True (default), per-tactic ``feedback`` includes
             all severities.  If False, drop entries at LSP Warning severity.
+        timeouts: Optional list of per-tactic Rocq ``Timeout`` budgets in
+            seconds.  When provided, its length must equal
+            ``len(tactics)``; each tactic then uses its own budget
+            (clamped to a minimum of 1 second; non-eligible tactics
+            still get ``None``).  The outer asyncio watchdog is widened
+            to cover ``sum(timeouts)`` so per-tactic budgets are not
+            clipped.  When omitted, the scalar ``ROCQ_PET_TIMEOUT`` is
+            divided evenly across all tactics — convenient but a poor
+            fit for batteries that mix cheap and expensive tactics.
+
+    Returns:
+        On success, ``success: True`` and a ``results: list[dict]``
+        with one entry per input tactic, preserving order.  Each entry
+        carries at least:
+
+        - ``tactic`` (str) — the input tactic.
+        - ``success`` (bool) — whether the tactic was accepted from
+          the base state.
+        - ``state_id`` (int, optional) — the resulting state when
+          ``success``.  Discardable — ``rocq_step_multi`` does not
+          advance the current state, so commit the winner with
+          ``rocq_check``.
+        - ``error`` / ``reason`` (str, on failure) — typically
+          ``reason: "tactic_failed"``.
+        - ``feedback`` (str, optional) — truncated visible output.
+        - ``time_ms`` (int) — non-negative wall-clock milliseconds
+          spent in the underlying pet call.  Present on both success
+          and ``tactic_failed`` entries.
 
     On ``pet_restarted: True``, call ``rocq_diag`` for memory headroom and
     recent error history.
@@ -1950,6 +2030,54 @@ async def rocq_check(
         timeout: Timeout in seconds (default: ROCQ_PET_TIMEOUT env var).
         include_warnings: If True (default), per-step ``feedback`` includes
             all severities.  If False, drop entries at LSP Warning severity.
+
+    Returns:
+        On success, a dict with ``success: True`` and the standard
+        interactive payload:
+
+        - ``state_id`` (int) — the new current state after running
+          ``body``.  Use as ``from_state`` for the next call.
+        - ``goals`` (str) — pretty-printed open goals at ``state_id``;
+          empty when ``proof_finished`` is True.
+        - ``proof_finished`` (bool) — True iff the proof closed.
+        - ``commands_run`` (int) — number of sentences executed.
+        - ``feedback`` (list[[str, str]], optional) — per-command
+          visible output, omitted when no command produced any.
+        - ``stale_warning`` (str, optional) — the backing ``.v`` file
+          was modified on disk after ``rocq_start``.
+
+        When ``proof_finished`` is True:
+
+        - ``proof_tactics`` (list[str]) — root-to-current tactic chain.
+        - ``proof_tactics_complete`` (bool) — False when the chain was
+          truncated by LRU eviction.  In that case, ``proof_tactics[0]``
+          is a sentinel ``"(* ... earlier tactics lost — chain broken at
+          state N *)"`` Coq comment so the list stays well-formed if
+          pasted into a ``.v`` file.
+        - ``proof_hint`` (str) — instructions for assembling a final
+          ``.v`` file.
+
+        On failure, in addition to ``success: False`` / ``error`` /
+        ``reason``, the response includes:
+
+        - ``last_valid_state_id`` (int, optional) — the most recent
+          successful state in the batch; recover via
+          ``rocq_check(from_state=...)`` or
+          ``rocq_step_multi(from_state=...)``.
+
+        **Bullet / focus payload.**  When ``body`` is exactly one
+        bullet or focus-management command (``{``, ``}``, or a run of
+        ``-``/``+``/``*``), the success response is enriched with:
+
+        - ``focus_command`` (str) — the detected token without the
+          trailing ``.``.
+        - ``goals_before`` / ``goals_after`` (int) — count of focused
+          open goals before / after the command.
+        - ``focus_depth_before`` / ``focus_depth_after`` (int) — number
+          of suspended ``{ ... }`` focus frames on the stack.
+
+        All five keys are additive and only appear for the
+        bullet/focus case.
 
     On ``pet_restarted: True``, call ``rocq_diag`` for memory headroom and
     recent error history.
