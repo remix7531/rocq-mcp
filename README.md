@@ -29,7 +29,27 @@ uv pip install -e ".[dev]"
 
 ## Tools
 
-The server exposes eleven MCP tools:
+The server exposes the following MCP tools.
+
+### Tool reference
+
+Quick reference for the full surface (cheap insurance against drift):
+
+| Tool | Purpose | Mode |
+|------|---------|------|
+| `rocq_compile` | Batch-compile source via coqc | stateless |
+| `rocq_compile_file` | Batch-compile a `.v` file via coqc | stateless |
+| `rocq_verify` | Sandboxed proof verification (Module M, Phase 1-3) | stateless |
+| `rocq_query` | Search/inspect the environment (preamble / file / from_state) | stateless |
+| `rocq_assumptions` | List axiom dependencies of a theorem | stateless |
+| `rocq_start` | Begin an interactive proof session, mint `state_id` | stateful |
+| `rocq_check` | Run proof commands from a `state_id`, advancing state | stateful |
+| `rocq_step_multi` | Try N tactics from a `state_id` without advancing | stateful (read) |
+| `rocq_toc` | Hierarchical outline of a `.v` file | stateless |
+| `rocq_notations` | List notations in a statement and their scopes | stateless |
+| `rocq_goal_at` | Goals at `(file, line, character)` — no `state_id` allocated | stateless |
+| `rocq_hover` | Identifier info at `(file, line, character)` — no `state_id` allocated | stateless |
+| `rocq_diag` | Pet health, memory headroom, recent errors | stateless |
 
 ### Compilation tools (coqc-based, no pytanque needed)
 
@@ -55,6 +75,21 @@ The server exposes eleven MCP tools:
 > **Stale file warning:** Interactive sessions (`rocq_start` / `rocq_check` / `rocq_step_multi`) read the `.v` file at session start and do not track subsequent edits. If another process or agent modifies the file while a session is active, the proof state becomes stale and tactics may fail or produce wrong results. In multi-agent setups, **work on a copy of the file** for interactive proving, or restart the session with `rocq_start` after edits. A `stale_warning` field is returned when a file modification is detected.
 
 > **Workspace auto-detection:** When a file-accepting tool (`rocq_compile_file`, `rocq_query`, `rocq_assumptions`, `rocq_toc`, `rocq_start`) is called without an explicit `workspace`, the server walks up from the file's directory looking for `_RocqProject`, `_CoqProject`, or `dune-project` markers and uses the directory of the innermost match. Falls back to `ROCQ_WORKSPACE` if no marker is found. Pass `workspace=` explicitly to override (e.g. for monorepos with nested project files).
+
+### File-anchored read tools
+
+`rocq_goal_at` and `rocq_hover` complement `rocq_start` by providing a
+stateless read path: they query Rocq at a `(file, line, character)`
+position without registering an entry in the state table.
+
+| Tool | Args | Returns |
+|------|------|---------|
+| `rocq_goal_at` | `file: str, line: int, character: int` | open goals at that position |
+| `rocq_hover` | `file: str, line: int, character: int` | best-effort `name`, `kind`, `type`, `qualified_name`, `definition_file`, plus raw `Locate`/`About` |
+
+Both responses carry `stateless: True`.  Use these when you only need
+to read at a known position; use `rocq_start` when you intend to
+continue with `rocq_check` / `rocq_step_multi`.
 
 ## Recommended usage patterns
 
@@ -125,6 +160,148 @@ When a tool returns `pet_restarted: True`, call `rocq_diag` for memory headroom 
 | `ROCQ_MAX_PET_RSS_MB` | `min(50% of system RAM, 16384)` | Maximum pet subprocess RSS (MB). On breach, the call aborts via the timeout recovery path; response includes `reason: "memory_exhausted"` and `pet_restarted: True`. |
 | `ROCQ_COQC_BINARY` | `coqc` | Path to the `coqc` binary |
 | `ROCQ_MAX_SOURCE_SIZE` | `1000000` | Maximum source size in bytes |
+| `ROCQ_PET_TIMEOUT_GRACE` | `10` | Extra seconds added on top of the Rocq-level `Timeout` budget before the outer asyncio watchdog fires.  Gives pet a chance to surface a clean `Timeout!` error instead of a process-level kill. |
+| `ROCQ_MAX_STATES` | `200` | Maximum number of interactive proof states kept in the LRU table.  When the table is full, evicting an ancestor can break a `proof_tactics` chain — the response then carries `proof_tactics_complete: False` and a sentinel as `proof_tactics[0]`. |
+
+### Tuning for heavy projects
+
+Projects with long import chains (large stdlib re-exports, MathComp-style
+hierarchies, generated code) often need bigger budgets.  Reasonable
+starting points:
+
+```bash
+export ROCQ_PET_TIMEOUT=120        # 30s default is too short for ~90s imports
+export ROCQ_PET_TIMEOUT_GRACE=60   # let Rocq's own Timeout fire first
+export ROCQ_MAX_STATES=1000        # deeper proof trees without LRU eviction
+export ROCQ_COQC_TIMEOUT=300       # batch compilation of large modules
+```
+
+These are advisory; tune in response to the symptoms (clamped timeouts,
+`proof_tactics_complete: False`, repeated `reason: "timeout"`) rather
+than setting them blindly.
+
+### Per-call timeouts
+
+Six pytanque-based tools accept an optional `timeout: int` (seconds):
+`rocq_start`, `rocq_step_multi`, `rocq_assumptions`, `rocq_query` (file
+mode), `rocq_toc`, `rocq_notations`.  Contract:
+
+- `timeout=0` (default) falls back to `ROCQ_PET_TIMEOUT`.
+- Raise the per-call value for files with heavy import chains rather
+  than bumping the global default.
+- When the value exceeds the matching `ROCQ_*_TIMEOUT_CAP`, it is
+  clamped and the response carries `clamped_timeout: <cap>`.
+
+#### Per-tactic `timeouts` on `rocq_step_multi`
+
+`rocq_step_multi` additionally accepts `timeouts: list[float]` for
+per-tactic budgets:
+
+- When supplied, each tactic in `tactics` uses its own budget.
+- `len(timeouts)` MUST equal `len(tactics)`; mismatches are rejected
+  with `reason: "validation"`.
+- If both the scalar `timeout` and the list `timeouts` are passed,
+  the list wins.
+- Each per-tactic entry in the response carries `time_ms` (wall-clock
+  milliseconds for the underlying pet call), on both success and
+  `tactic_failed` outcomes.
+
+## Response envelope
+
+Every tool returns a structured response that follows the same contract
+so an agent can dispatch without parsing free-form text:
+
+- **Success.** `success: True` is always present; tool-specific keys
+  follow.  Legacy boolean aliases (notably `verified`) are **forbidden**
+  and locked in by `tests/test_envelope_contract.py` — do not rely on
+  them, do not re-introduce them.
+- **Failure.** `success: False`, `error: str` (human-readable), `reason:
+  <enum>` (see the *Failure envelope and `reason` taxonomy* section
+  above for the enumeration).
+
+### Additive keys agents commonly see
+
+The following keys are additive — they appear when the relevant
+condition is met and are otherwise omitted.  Tools never reshape an
+existing key into a new type; if a feature needs different data, it
+ships under a new name.
+
+- `pet_restarted: True` — the `pet` subprocess was killed and respawned
+  during this call; any state IDs from earlier calls are invalid.
+- `clamped_timeout: <seconds>` — the per-call `timeout` requested
+  exceeded the matching `ROCQ_*_TIMEOUT_CAP` and was reduced.
+- `state_id: <int>` — a reusable interactive proof state (issued by
+  `rocq_start`, `rocq_check`, `rocq_step_multi`, or
+  state-capture-enriched compile failures).
+- `goals: str` — pretty-printed open goals at the returned state.
+- `proof_tactics: list[str]` — root-to-current tactic chain returned
+  when a proof is finished.
+- `proof_tactics_complete: bool` — `False` when the chain was
+  truncated because an ancestor was evicted from the LRU.
+  When `False`, `proof_tactics[0]` is a `(* ... earlier tactics lost
+  — chain broken at state N *)` sentinel comment so the list stays
+  well-formed if pasted into a `.v` file.
+- `stale_warning: str` — the `.v` file backing this session was
+  modified on disk after `rocq_start`; proof state may not match
+  the source any more.
+- `feedback: list[[str, str]]` — `[command, output]` pairs from
+  commands that produce visible output (`Print`, `Check`, `Search`,
+  `vm_compute`, etc.); per-step truncated.
+- `time_ms: int` — wall-clock milliseconds spent in the underlying
+  pet call.  Per-tactic entry on `rocq_step_multi`.
+- `stale_dependencies: {files, count, truncated, advisory}` —
+  emitted by `rocq_compile_file` when `.v` files in the workspace are
+  newer than their sibling `.vo`.  Advisory only; the compile result
+  itself is unchanged.
+- `focus_command`, `goals_before`, `goals_after`,
+  `focus_depth_before`, `focus_depth_after` — emitted by `rocq_check`
+  when the body is a single bullet/focus token (`{`, `}`, `-`, `+`,
+  `*` or a run thereof).  Lets the agent see the focus transition
+  rather than an empty `goals` string.
+- `stateless: True` — returned by `rocq_goal_at` and `rocq_hover`
+  (file-anchored read tools).  Marks that no entry was allocated in
+  the state table.
+
+## Recovery / troubleshooting
+
+This section is keyed on observable response fields so the appropriate
+recovery is obvious without re-reading the section above.
+
+- **`pet_restarted: True`.** Call `rocq_diag` to see what happened
+  (memory headroom, recent errors), then call `rocq_start` to mint
+  fresh state IDs.  Discard any cached `state_id` from earlier in the
+  conversation — they belonged to the previous pet process and no
+  longer resolve.
+- **`proof_tactics_complete: False`.** An ancestor state was evicted
+  from the LRU.  Raise `ROCQ_MAX_STATES` for the rest of
+  the session, or rebuild the chain by calling `rocq_start` and
+  re-applying tactics.  The first element of `proof_tactics` is a
+  `(* ... earlier tactics lost — chain broken at state N *)`
+  sentinel — keep it in place if you paste the list into a `.v`
+  file; remove it once you've reconstructed the prefix.
+- **`stale_warning` (session) / `stale_dependencies` (compile).**
+  Run `make` (or your project's equivalent) before trusting the
+  result.  For interactive sessions, restart with `rocq_start` after
+  the rebuild.
+- **`clamped_timeout: <cap>`.** Raise the matching
+  `ROCQ_*_TIMEOUT_CAP` env var, or split the query into smaller
+  pieces.  The Rocq-level work itself ran with the lower budget.
+- **`state_capture_status="outside_proof"` / `"no_position"`.**
+  Expected outcomes for vernac-level positions (e.g. an error in a
+  `Definition` rather than a tactic).  Not a server-side bug; follow
+  the original `hint` (usually `rocq_start(file=..., line=...,
+  character=...)`).
+- **`force_restart=True` on `rocq_start`.** Use when pet is alive but
+  wedged — typically you've seen `reason: "unavailable"` without an
+  outright `crashed`, suggesting coq-lsp indexing has gotten into a
+  bad state.  Kills the pet process and clears all
+  caches before starting.
+- **Bullet / focus interpretation.** After a `{`,
+  `focus_depth_after > 0` means you've entered a focus block.
+  `goals_after == 0` with a non-zero `focus_depth_after` means the
+  subproof closed cleanly and a `}` is the next expected command.
+  After a `}`, `focus_depth_after` should be one lower than
+  `focus_depth_before`.
 
 ## Security Model
 
@@ -240,7 +417,7 @@ Tests for pytanque-based tools (`rocq_query`, `rocq_assumptions`, `rocq_start`, 
 ```
 src/rocq_mcp/
   __init__.py            Package init
-  server.py              MCP server, 11 @mcp.tool wrappers, pet subprocess management
+  server.py              MCP server, @mcp.tool wrappers, pet subprocess management
   compile.py             coqc-based tools: compile, compile_file, verify
   compile_enrichment.py  Compile-error-state orchestration (PET state capture)
   diag.py                rocq_diag snapshot builder (pet uptime, memory, recent errors)

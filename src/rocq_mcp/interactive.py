@@ -1,16 +1,24 @@
-"""Rocq MCP Server — interactive proof tools (start, check, step_multi, query, toc, notations).
+"""Rocq MCP Server — interactive proof tools (pytanque-backed).
 
 This module contains the implementation of all tools that use the pytanque
 (pet) subprocess for interactive proof exploration.  All functions accept
 a ``lifespan_state`` dict instead of a FastMCP ``Context`` so they can be
 tested without the MCP framework.
 
-Tools:
-- **rocq_start** — opens a proof context, returns ``state_id``
-- **rocq_check** — executes commands sequentially (one tactic = step,
-  full proof = batch)
-- **rocq_step_multi** — try N tactics from the same state (branching),
-  read-only exploration
+Public ``run_*`` entry points (one per MCP tool):
+
+- **run_start** — opens a proof context, returns ``state_id``.
+- **run_check** — executes commands sequentially (one tactic = step,
+  full proof = batch).
+- **run_step_multi** — try N tactics from the same state (branching),
+  read-only exploration.
+- **run_query** — environment queries (``Search`` / ``Check`` /
+  ``Print`` / …) in preamble / file / from_state modes.
+- **run_assumptions** — ``Print Assumptions`` for a given theorem.
+- **run_toc** — file outline of definitions, lemmas, sections.
+- **run_notations** — notation resolution for a Rocq statement.
+- **run_goal_at** — stateless goal lookup at ``(file, line, character)``.
+- **run_hover** — stateless symbol info at ``(file, line, character)``.
 
 Infrastructure:
 - **Import cache** — ``_get_or_create_import_state`` caches the pytanque
