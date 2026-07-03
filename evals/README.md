@@ -1,6 +1,6 @@
 # rocq-mcp evals
 
-Regression harness for the MCP tool surface. Two tiers:
+Regression harness for the MCP tool surface:
 
 - **Tier 1 (scripted, deterministic)** — fixed tool sequences per corpus task,
   driven through an in-memory `fastmcp.Client` against the live server object,
@@ -8,15 +8,6 @@ Regression harness for the MCP tool surface. Two tiers:
   normal pytest suite (`tests/test_evals_tier1.py`) whenever `coqc` and `pet`
   are on PATH (they are in CI). Renaming a parameter, changing a failure
   `reason`, or breaking the envelope fails tier 1 immediately.
-- **Tier 2 (agent-driven, manual)** — a real agent (`claude -p`) solves the
-  same corpus through the MCP server; graded independently after the fact
-  (fresh MCP session runs the task's `check` block — the transcript is never
-  trusted). Reports success rate, per-tool call histogram, cost, and wall
-  time, and diffs against `baselines/baseline.json`. Run locally with
-  `uv run python -m evals.runner.run_agent` (needs coqc, pet, the `claude`
-  CLI) or via the `Tier-2 evals` workflow dispatch. Write a new baseline
-  deliberately with `--baseline` and commit it. Corpus target is ~15 tasks
-  (currently 9) — additions welcome, one scenario per task.
 
 ## Corpus layout
 
