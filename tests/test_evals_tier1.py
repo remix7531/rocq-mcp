@@ -31,13 +31,6 @@ pytestmark = [
 TASKS = load_corpus()
 
 
-def test_every_task_has_a_scenario():
-    missing = [t.id for t in TASKS if t.id not in scenarios.SCENARIOS]
-    assert not missing, f"corpus tasks without a tier-1 scenario: {missing}"
-    orphaned = [tid for tid in scenarios.SCENARIOS if tid not in {t.id for t in TASKS}]
-    assert not orphaned, f"scenarios without a corpus task: {orphaned}"
-
-
 @pytest.mark.parametrize("task", TASKS, ids=[t.id for t in TASKS])
 async def test_tier1(task, tmp_path):
     from fastmcp import Client

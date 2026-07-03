@@ -1,0 +1,29 @@
+id: prove_negb_involutive
+kind: prove
+tags: [case-analysis, bool]
+prompt: |
+  The file {workspace}/Negb.v states `Theorem negb_inv : forall b : bool,
+  negb (negb b) = b.` and ends it with `Admitted.`. Prove it with the
+  rocq-mcp tools, write the finished proof into the file, and confirm it
+  compiles with rocq_compile_file.
+entry_file: Negb.v
+budget:
+  max_tool_calls: 20
+  max_wall_s: 240
+check:
+  - tool: rocq_compile_file
+    args:
+      file: "{workspace}/Negb.v"
+      workspace: "{workspace}"
+    expect:
+      success: true
+  - tool: rocq_verify
+    args:
+      proof: "@Negb.v"
+      problem_name: negb_inv
+      problem_statement: |
+        Theorem negb_inv : forall b : bool, negb (negb b) = b.
+        Admitted.
+      workspace: "{workspace}"
+    expect:
+      success: true

@@ -1,0 +1,88 @@
+name: Tier-2 evals (agent-driven)
+
+# Manual dispatch only — LLM runs cost money and are nondeterministic, so
+# this is a soft gate that publishes a report, never a PR blocker.
+on:
+  workflow_dispatch:
+    inputs:
+      task:
+        description: "Run a single task id (empty = full corpus)"
+        required: false
+        default: ""
+      max_turns:
+        description: "Max agent turns per task"
+        required: false
+        default: "40"
+
+jobs:
+  tier2:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup OCaml
+        uses: ocaml/setup-ocaml@v3
+        with:
+          ocaml-compiler: 5.2.x
+          opam-repositories: |
+            default: https://github.com/ocaml/opam-repository.git
+
+      - name: Restore OCaml dependencies
+        id: cache-ocaml
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.opam
+            ~/.cache/opam
+            _opam
+          key: ocaml-deps-${{ runner.os }}-5.2.x-rocq-v2
+          restore-keys: |
+            ocaml-deps-${{ runner.os }}-5.2.x-rocq-v2
+
+      - name: Install Rocq dependencies
+        if: steps.cache-ocaml.outputs.cache-hit != 'true'
+        run: opam install -y rocq-prover coq-lsp
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          version: "latest"
+
+      - name: Install dependencies
+        run: uv sync --extra dev
+
+      - name: Install Claude Code
+        run: npm install -g @anthropic-ai/claude-code
+
+      - name: Run tier-2 evals
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          EVAL_TASK: ${{ inputs.task }}
+          EVAL_MAX_TURNS: ${{ inputs.max_turns }}
+        run: |
+          eval $(opam env)
+          # Validate dispatch inputs before they reach argv.
+          if ! printf '%s' "${EVAL_MAX_TURNS}" | grep -qE '^[0-9]+$'; then
+            echo "max_turns must be numeric" >&2; exit 2
+          fi
+          if [ -n "${EVAL_TASK}" ] && ! printf '%s' "${EVAL_TASK}" | grep -qE '^[a-z0-9_]+$'; then
+            echo "task must be a corpus id ([a-z0-9_]+)" >&2; exit 2
+          fi
+          set -- --max-turns "${EVAL_MAX_TURNS}"
+          if [ -n "${EVAL_TASK}" ]; then set -- "$@" --task "${EVAL_TASK}"; fi
+          uv run python -m evals.runner.run_agent "$@" | tee report.md
+          # Surface the report in the job summary either way.
+          cat evals/results/*.md >> "$GITHUB_STEP_SUMMARY" || true
+        continue-on-error: true
+
+      - name: Upload results
+        uses: actions/upload-artifact@v4
+        with:
+          name: tier2-eval-results
+          path: evals/results/
+          if-no-files-found: warn

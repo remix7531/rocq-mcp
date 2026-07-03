@@ -1,0 +1,31 @@
+id: prove_app_nil_r
+kind: prove
+tags: [induction, lists]
+prompt: |
+  The file {workspace}/AppNil.v states `Theorem app_nil_right : forall
+  (A : Type) (l : list A), app l nil = l.` and ends it with `Admitted.`.
+  Prove it interactively (induction on the list works), write the
+  finished proof into the file, and confirm it compiles.
+entry_file: AppNil.v
+budget:
+  max_tool_calls: 30
+  max_wall_s: 300
+check:
+  - tool: rocq_compile_file
+    args:
+      file: "{workspace}/AppNil.v"
+      workspace: "{workspace}"
+    expect:
+      success: true
+  - tool: rocq_verify
+    args:
+      proof: "@AppNil.v"
+      problem_name: app_nil_right
+      problem_statement: |
+        From Coq Require Import List.
+
+        Theorem app_nil_right : forall (A : Type) (l : list A), app l nil = l.
+        Admitted.
+      workspace: "{workspace}"
+    expect:
+      success: true

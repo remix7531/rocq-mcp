@@ -1,0 +1,19 @@
+id: find_lemma_mul_comm
+kind: find_lemma
+tags: [search, structured]
+prompt: |
+  Using rocq_search (not raw Search through rocq_query), find the
+  standard-library lemma stating commutativity of multiplication on nat.
+  Report its fully qualified name and type.
+entry_file: null
+budget:
+  max_tool_calls: 8
+  max_wall_s: 120
+check:
+  - tool: rocq_search
+    args:
+      preamble: "From Coq Require Import Arith."
+      pattern: "(_ * _ = _ * _)"
+    expect:
+      success: true
+      hits_contains: "mul_comm"

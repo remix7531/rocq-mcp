@@ -1,0 +1,30 @@
+id: fix_missing_import
+kind: fix
+tags: [compile-error-recovery, imports]
+prompt: |
+  The file {workspace}/NeedsLia.v does not compile: the proof uses the
+  `lia` tactic but the file is missing the import that provides it.
+  Diagnose with rocq_compile_file, fix the file, and confirm it compiles.
+entry_file: NeedsLia.v
+budget:
+  max_tool_calls: 20
+  max_wall_s: 240
+check:
+  - tool: rocq_compile_file
+    args:
+      file: "{workspace}/NeedsLia.v"
+      workspace: "{workspace}"
+    expect:
+      success: true
+  - tool: rocq_verify
+    args:
+      proof: "@NeedsLia.v"
+      problem_name: le_plus_l
+      problem_statement: |
+        From Coq Require Import Lia.
+
+        Theorem le_plus_l : forall n m : nat, n <= n + m.
+        Admitted.
+      workspace: "{workspace}"
+    expect:
+      success: true

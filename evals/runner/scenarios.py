@@ -169,10 +169,84 @@ async def prove_with_step_multi(client: Any, ws: Path) -> None:
     assert comp["success"] is True, comp
 
 
+async def prove_negb_involutive(client: Any, ws: Path) -> None:
+    file = str(ws / "Negb.v")
+    start = await _call(
+        client, "rocq_start", file=file, theorem="negb_inv", workspace=str(ws)
+    )
+    assert start["success"] is True, start
+    chk = await _call(
+        client,
+        "rocq_check",
+        from_state=start["state_id"],
+        body="intros b. destruct b; reflexivity.",
+    )
+    assert chk["success"] is True and chk["proof_finished"] is True, chk
+    # The server now assembles the script — use it directly.
+    assert "proof_script" in chk, chk
+    (ws / "Negb.v").write_text(chk["proof_script"])
+    comp = await _call(client, "rocq_compile_file", file=file, workspace=str(ws))
+    assert comp["success"] is True, comp
+
+
+async def prove_app_nil_r(client: Any, ws: Path) -> None:
+    file = str(ws / "AppNil.v")
+    start = await _call(
+        client, "rocq_start", file=file, theorem="app_nil_right", workspace=str(ws)
+    )
+    assert start["success"] is True, start
+    chk = await _call(
+        client,
+        "rocq_check",
+        from_state=start["state_id"],
+        body=(
+            "intros A l. induction l as [| x xs IH]. "
+            "- reflexivity. - simpl. rewrite IH. reflexivity."
+        ),
+        goals_format="diff",
+    )
+    assert chk["success"] is True and chk["proof_finished"] is True, chk
+    _finish_file(
+        ws / "AppNil.v",
+        "Proof.\n  intros A l. induction l as [| x xs IH].\n"
+        "  - reflexivity.\n  - simpl. rewrite IH. reflexivity.\nQed.\n",
+    )
+    comp = await _call(client, "rocq_compile_file", file=file, workspace=str(ws))
+    assert comp["success"] is True, comp
+
+
+async def fix_missing_import(client: Any, ws: Path) -> None:
+    file = str(ws / "NeedsLia.v")
+    comp = await _call(client, "rocq_compile_file", file=file, workspace=str(ws))
+    assert comp["success"] is False, comp
+    assert comp["reason"] == "compile_error", comp
+
+    text = (ws / "NeedsLia.v").read_text()
+    (ws / "NeedsLia.v").write_text("From Coq Require Import Lia.\n\n" + text)
+    comp = await _call(client, "rocq_compile_file", file=file, workspace=str(ws))
+    assert comp["success"] is True, comp
+
+
+async def find_lemma_mul_comm(client: Any, ws: Path) -> None:
+    s = await _call(
+        client,
+        "rocq_search",
+        preamble="From Coq Require Import Arith.",
+        pattern="(_ * _ = _ * _)",
+    )
+    assert s["success"] is True, s
+    names = [h.get("name", "") for h in s["hits"]]
+    assert any("mul_comm" in n for n in names), s
+
+
 SCENARIOS = {
     "prove_add_0_r": prove_add_0_r,
     "prove_andb_comm": prove_andb_comm,
     "fix_wrong_tactic": fix_wrong_tactic,
     "find_lemma_add_comm": find_lemma_add_comm,
     "prove_with_step_multi": prove_with_step_multi,
+    "prove_negb_involutive": prove_negb_involutive,
+    "prove_app_nil_r": prove_app_nil_r,
+    "fix_missing_import": fix_missing_import,
+    "find_lemma_mul_comm": find_lemma_mul_comm,
 }

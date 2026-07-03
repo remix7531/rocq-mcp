@@ -13,3 +13,6 @@ build/
 *.timing
 .pytest_cache/
 .venv/
+
+# tier-2 eval run outputs (baselines ARE committed)
+evals/results/
