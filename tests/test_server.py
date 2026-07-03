@@ -2822,8 +2822,7 @@ class TestUsagePatternDocs:
 
     def _guide_text(self) -> str:
         guide = (
-            Path(__file__).resolve().parent.parent
-            / "src/rocq_mcp/guides/workflows.md"
+            Path(__file__).resolve().parent.parent / "src/rocq_mcp/guides/workflows.md"
         )
         return guide.read_text(encoding="utf-8")
 
