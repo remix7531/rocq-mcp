@@ -145,3 +145,6 @@ jobs:
 
       - name: Lint (ruff)
         run: uv run ruff check src/ tests/
+
+      - name: Check README tools table is generated
+        run: uv run python scripts/gen_docs.py --check
