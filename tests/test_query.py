@@ -10,6 +10,7 @@ from pathlib import Path
 
 import pytest
 
+import rocq_mcp.workspace as _workspace
 from rocq_mcp.interactive import run_query
 from tests.conftest import PET_AVAILABLE, _MockPetBase
 
@@ -585,7 +586,7 @@ class TestRocqQueryWrapper:
             return {"success": True, "output": "mock"}
 
         monkeypatch.setattr(_server, "run_query", mock_run_query)
-        monkeypatch.setattr(_server, "_validate_workspace", lambda ws: None)
+        monkeypatch.setattr(_workspace, "_validate_workspace", lambda ws: None)
 
         mock_ctx = _MockContext({"pet_client": None})
 
@@ -659,7 +660,7 @@ class TestRocqQueryTimeout:
             return {"success": True, "output": "mock"}
 
         monkeypatch.setattr(_server, "run_query", mock_run_query)
-        monkeypatch.setattr(_server, "_validate_workspace", lambda ws: None)
+        monkeypatch.setattr(_workspace, "_validate_workspace", lambda ws: None)
         return captured
 
     @pytest.mark.asyncio
@@ -1020,7 +1021,7 @@ class TestRocqQueryFromStateWrapper:
             return {"success": True, "output": "mock"}
 
         monkeypatch.setattr(_server, "run_query", mock_run_query)
-        monkeypatch.setattr(_server, "_validate_workspace", lambda ws: None)
+        monkeypatch.setattr(_workspace, "_validate_workspace", lambda ws: None)
 
         result = await rocq_query(
             command="Search nat.",
@@ -1041,7 +1042,7 @@ class TestRocqQueryFromStateWrapper:
             return {"success": True, "output": "mock"}
 
         monkeypatch.setattr(_server, "run_query", mock_run_query)
-        monkeypatch.setattr(_server, "_validate_workspace", lambda ws: None)
+        monkeypatch.setattr(_workspace, "_validate_workspace", lambda ws: None)
 
         await rocq_query(
             command="Check nat.",

@@ -15,6 +15,7 @@ import glob as glob_mod
 
 import pytest
 
+import rocq_mcp.workspace as _workspace
 from rocq_mcp.server import _PYTANQUE_NOT_INSTALLED_HINT, rocq_compile
 from tests.conftest import (
     _DEFAULT_STDERR,
@@ -780,7 +781,7 @@ class TestRocqCompileWrapper:
             )
             return {"success": True, "output": "mock"}
 
-        monkeypatch.setattr(_server, "_validate_workspace", lambda ws: None)
+        monkeypatch.setattr(_workspace, "_validate_workspace", lambda ws: None)
         monkeypatch.setattr(
             _server, "run_compile_with_state", mock_run_compile_with_state
         )
