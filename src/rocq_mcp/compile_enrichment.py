@@ -255,7 +255,7 @@ async def _enrich_compile_failure(
 async def run_compile_with_state(
     source: str,
     workspace: str,
-    timeout: int,
+    timeout: float,
     include_warnings: bool = True,
     lifespan_state: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
@@ -345,7 +345,7 @@ async def _multi_error_walk(
 async def run_compile_file_with_state(
     file: str,
     workspace: str,
-    timeout: int,
+    timeout: float,
     include_warnings: bool = True,
     lifespan_state: dict[str, Any] | None = None,
     keep_vo: bool = False,

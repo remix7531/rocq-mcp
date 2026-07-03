@@ -57,7 +57,7 @@ _PROOF_FILE_LABEL: str = "<proof>"
 def _run_coqc_process(
     file_path: str,
     workspace: Path,
-    timeout: int,
+    timeout: float,
     mode: str = "full",
     timing: bool = False,
 ) -> dict[str, Any]:
@@ -151,7 +151,7 @@ def _run_coqc_process(
         }
 
 
-def _run_coqc(source: str, workspace: str, timeout: int) -> dict[str, Any]:
+def _run_coqc(source: str, workspace: str, timeout: float) -> dict[str, Any]:
     """Write source to temp file, run coqc, return result dict."""
     ws = Path(workspace).resolve()
     with tempfile.NamedTemporaryFile(
@@ -173,7 +173,7 @@ _VO_FAMILY: tuple[str, ...] = (".vo", ".vok", ".vos")
 def _run_coqc_file(
     file_path: str,
     workspace: str,
-    timeout: int,
+    timeout: float,
     keep_vo: bool = False,
     mode: str = "full",
     timing: bool = False,
@@ -363,16 +363,16 @@ def _format_error(
                 continue
             if len(seen_warnings) >= _MAX_FORMAT_WARNINGS:
                 continue
-            seen_warnings.add(d["body"])
+            seen_warnings.add(str(d["body"]))
         selected.append(d)
         if d["kind"] == "Error":
             break
 
     parts = []
     for d in selected:
-        line_1 = d["line"]
-        char_start = d["char_start"]
-        char_end = d["char_end"]
+        line_1 = int(d["line"])
+        char_start = int(d["char_start"])
+        char_end = int(d["char_end"])
 
         header = f"{file_label}, line {line_1}, characters {char_start}-{char_end}:"
 
@@ -529,7 +529,7 @@ def _format_last_completed_phrase(entry: dict[str, Any]) -> str:
 def _build_compile_result(
     result: dict[str, Any],
     source: str,
-    timeout: int,
+    timeout: float,
     include_warnings: bool,
     *,
     file_label: str = _PROOF_FILE_LABEL,
@@ -660,7 +660,7 @@ def _build_compile_result(
 def run_compile(
     source: str,
     workspace: str,
-    timeout: int,
+    timeout: float,
     include_warnings: bool = True,
 ) -> dict[str, Any]:
     """Core implementation of rocq_compile (testable without FastMCP Context).
@@ -695,7 +695,7 @@ def run_compile(
 def run_compile_file(
     file: str,
     workspace: str,
-    timeout: int,
+    timeout: float,
     include_warnings: bool = True,
     keep_vo: bool = False,
     mode: str = "full",
@@ -1100,7 +1100,7 @@ def _try_direct_verification(
     problem_name: str,
     problem_statement: str,
     workspace: str,
-    timeout: int,
+    timeout: float,
 ) -> dict[str, Any] | None:
     """Attempt Phase 3 direct verification (no Module M sandbox).
 
@@ -1183,13 +1183,13 @@ def _try_direct_verification(
 # ---------------------------------------------------------------------------
 
 
-def _remaining_timeout(t0: float, timeout: int, minimum: int = 10) -> int:
+def _remaining_timeout(t0: float, timeout: float, minimum: int = 10) -> int:
     """Compute remaining timeout budget from wall-clock start time.
 
     Returns at least *minimum* seconds so Phase 3 always gets a fair chance.
     """
     elapsed = time.monotonic() - t0
-    return max(minimum, timeout - int(elapsed))
+    return max(minimum, int(timeout) - int(elapsed))
 
 
 def _phase3_or_fallback(
@@ -1197,7 +1197,7 @@ def _phase3_or_fallback(
     problem_name: str,
     problem_statement: str,
     workspace: str,
-    timeout: int,
+    timeout: float,
     fallback: dict[str, Any],
 ) -> dict[str, Any]:
     """Try Phase 3 direct verification; return *fallback* if Phase 3 cannot apply."""
@@ -1214,7 +1214,7 @@ def _run_phase1_module_m(
     problem_name: str,
     problem_statement: str,
     workspace: str,
-    timeout: int,
+    timeout: float,
     include_warnings: bool,
 ) -> tuple[dict[str, Any] | None, dict[str, Any]]:
     """Phase 1: Standard Module M sandbox (strongest security).
@@ -1292,7 +1292,7 @@ async def _run_phase2_shared_defs(
     problem_name: str,
     problem_statement: str,
     workspace: str,
-    timeout: int,
+    timeout: float,
     lifespan_state: dict[str, Any] | None,
     phase1_failure: dict[str, Any],
     t0: float,
@@ -1387,7 +1387,7 @@ async def run_verify(
     problem_name: str,
     problem_statement: str,
     workspace: str,
-    timeout: int,
+    timeout: float,
     include_warnings: bool,
     lifespan_state: dict[str, Any] | None,
 ) -> dict[str, Any]:

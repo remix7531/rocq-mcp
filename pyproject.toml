@@ -17,6 +17,7 @@ dev = [
     "pytest-timeout>=2.3",
     "black>=24.0",
     "ruff>=0.8",
+    "mypy>=1.13",
     "pyyaml>=6.0",
 ]
 
@@ -67,3 +68,34 @@ ignore = [
 
 [tool.ruff.lint.isort]
 known-first-party = ["rocq_mcp"]
+
+[tool.mypy]
+python_version = "3.11"
+files = ["src/rocq_mcp"]
+check_untyped_defs = true
+warn_redundant_casts = true
+# The codebase uses FastMCP's `ctx: Context = None` idiom on every tool
+# wrapper (Context params are injected, never client-supplied); accept
+# the implicit Optional rather than churning 15 signatures.
+implicit_optional = true
+# The big envelope-factory modules (server/interactive/compile) are
+# deliberately dict[str, Any]-shaped; strictness is ratcheted per-module
+# below instead of globally.
+
+[[tool.mypy.overrides]]
+module = ["pytanque.*", "psutil.*"]
+ignore_missing_imports = true
+
+# Leaf modules are born strict; the ratchet grows toward the trunk as
+# the decomposition proceeds.
+[[tool.mypy.overrides]]
+module = [
+    "rocq_mcp.config",
+    "rocq_mcp.taxonomy",
+    "rocq_mcp.envelope",
+    "rocq_mcp.schemas",
+    "rocq_mcp.diag",
+    "rocq_mcp.proof_walk",
+]
+disallow_untyped_defs = true
+disallow_incomplete_defs = true

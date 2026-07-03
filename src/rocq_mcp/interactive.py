@@ -1173,6 +1173,7 @@ async def run_goal(
 
     resolved_file = ""
     if by_pos:
+        assert line is not None and character is not None  # by_pos guarantee
         if not (0 <= line <= _MAX_LINE_CHAR_RANGE) or not (
             0 <= character <= _MAX_LINE_CHAR_RANGE
         ):
@@ -1189,6 +1190,7 @@ async def run_goal(
     def _do_goal(pet: Any) -> dict[str, Any]:
         stale_warning: str | None = None
         if by_state:
+            assert from_state is not None  # by_state guarantee
             entry, base_id, err = _resolve_check_base_state(from_state)
             if err or entry is None:
                 return _server._fail(
@@ -1414,7 +1416,7 @@ async def run_assumptions(
             "error": msg,
             "raw_output": raw_output,
         }
-    result = {
+    payload: dict[str, Any] = {
         "success": True,
         "theorem": clean_name,
         "assumptions": [f"{name} : {ty}" for name, ty in pairs],
@@ -1423,8 +1425,8 @@ async def run_assumptions(
     # the raw text is opt-in.  (Parse failures above keep raw_output
     # unconditionally — there it IS the payload.)
     if include_raw:
-        result["raw_output"] = raw_output
-    return result
+        payload["raw_output"] = raw_output
+    return payload
 
 
 # ---------------------------------------------------------------------------
@@ -2154,6 +2156,7 @@ async def run_start(
         )
 
     if _start_by_pos:
+        assert line is not None and character is not None  # mode guarantee
         if not (0 <= line <= _MAX_LINE_CHAR_RANGE) or not (
             0 <= character <= _MAX_LINE_CHAR_RANGE
         ):
@@ -2189,6 +2192,7 @@ async def run_start(
                 goals_format=goals_format,
             )
         if _start_by_pos:
+            assert line is not None and character is not None  # mode guarantee
             return _build_position_start_result(
                 pet,
                 file=file,
@@ -2853,16 +2857,16 @@ async def run_step_multi(
         successes = [e for e in results if e.get("success")]
         finished = [e["tactic"] for e in successes if e.get("proof_finished")]
         best: dict[str, Any] | None = None
-        for e in successes:
-            count = e.get("goals_count")
+        for entry in successes:
+            count = entry.get("goals_count")
             if count is None:
                 continue
-            key = (not e.get("proof_finished", False), count)
+            key = (not entry.get("proof_finished", False), count)
             if best is None or key < (
                 not best.get("proof_finished", False),
                 best.get("goals_count", 1 << 30),
             ):
-                best = e
+                best = entry
         resp: dict[str, Any] = {
             "success": True,
             "results": results,
