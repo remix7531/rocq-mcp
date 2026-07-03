@@ -58,6 +58,20 @@
 - Tier-1 eval harness (`evals/`), ruff, pytest-timeout, 3.12/3.13 CI
   job, generated README tools table.
 
+### Added (protocol surface)
+
+- **Output schemas** on the four highest-dispatch tools (rocq_check,
+  rocq_step_multi, rocq_compile_file, rocq_search): permissive
+  declarations (`required: ["success"]`, extra keys allowed) whose
+  `reason` enum derives from the taxonomy. `mode` on rocq_compile_file
+  is now schema-enforced (`"full" | "vos"`).
+- **Progress notifications**: per-tactic on rocq_step_multi, per-chunk
+  on the multi-error walker, per-phase on rocq_verify — thread-safe,
+  best-effort (no-ops without a client progressToken).
+- **Lifecycle logging** (MCP log notifications): pet spawn (info),
+  pet killed with the failure reason (warning), force_restart
+  (warning).
+
 ### Changed
 
 - Tool descriptions rewritten as ≤2KB contracts; deep reference moved
