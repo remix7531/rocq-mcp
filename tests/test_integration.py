@@ -215,7 +215,7 @@ class TestCompileVerifyWorkflow:
         """rocq_compile resolves local imports via _CoqProject flags."""
         import subprocess
 
-        from rocq_mcp.server import ROCQ_COQC_BINARY
+        from rocq_mcp.config import ROCQ_COQC_BINARY
 
         # Set up a mini project with a helper module
         (tmp_path / "_CoqProject").write_text("-Q . TestProj\n")
@@ -241,7 +241,8 @@ class TestCompileVerifyWorkflow:
         """rocq_verify works with local imports resolved via _CoqProject."""
         import subprocess
 
-        from rocq_mcp.server import ROCQ_COQC_BINARY, rocq_compile, rocq_verify
+        from rocq_mcp.config import ROCQ_COQC_BINARY
+        from rocq_mcp.server import rocq_compile, rocq_verify
 
         # Set up a mini project
         (tmp_path / "_CoqProject").write_text("-Q . TestProj\n")

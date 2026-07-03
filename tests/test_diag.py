@@ -15,6 +15,8 @@ from unittest.mock import MagicMock
 
 import pytest
 
+import rocq_mcp.config as _config
+import rocq_mcp.pet_runtime as _pet_runtime
 import rocq_mcp.server as _server
 from rocq_mcp.server import (
     _build_diag_snapshot,
@@ -43,17 +45,17 @@ def _fresh_lifespan_state() -> dict:
 @pytest.fixture(autouse=True)
 def _reset_pet_state(monkeypatch):
     """Reset pet semaphore + lock between tests."""
-    _server._pet_semaphore = None
+    _pet_runtime._pet_semaphore = None
     import threading
 
-    monkeypatch.setattr(_server, "_pet_lock", threading.Lock())
+    monkeypatch.setattr(_pet_runtime, "_pet_lock", threading.Lock())
     yield
-    _server._pet_semaphore = None
+    _pet_runtime._pet_semaphore = None
 
 
 @pytest.fixture(autouse=True)
 def _fast_watchdog(monkeypatch):
-    monkeypatch.setattr(_server, "_MEMORY_WATCHDOG_INTERVAL", 0.01)
+    monkeypatch.setattr(_config, "_MEMORY_WATCHDOG_INTERVAL", 0.01)
 
 
 # ---------------------------------------------------------------------------
@@ -136,7 +138,7 @@ class TestDiagSchema:
 
     @pytest.mark.asyncio
     async def test_max_rss_mb_threshold_reports_env_value(self, monkeypatch):
-        monkeypatch.setattr(_server, "ROCQ_MAX_PET_RSS_MB", 4242)
+        monkeypatch.setattr(_config, "ROCQ_MAX_PET_RSS_MB", 4242)
         ls = _fresh_lifespan_state()
         snap = _build_diag_snapshot(ls)
         assert snap["memory"]["max_rss_mb_threshold"] == 4242.0
@@ -316,9 +318,9 @@ class TestRestartCounters:
 
         # Stub _kill_pet to avoid touching real process state.
         killed: list[MagicMock] = []
-        monkeypatch.setattr(_server, "_kill_pet", lambda p: killed.append(p))
+        monkeypatch.setattr(_pet_runtime, "_kill_pet", lambda p: killed.append(p))
         # Suppress the state-table invalidation hook (no-op for this test).
-        monkeypatch.setattr(_server, "_pet_invalidation_hooks", [])
+        monkeypatch.setattr(_pet_runtime, "_pet_invalidation_hooks", [])
 
         _server._invalidate_pet(ls)
         assert killed == [mock_pet]
@@ -334,13 +336,13 @@ class TestRestartCounters:
 class TestPeakRss:
     @pytest.mark.asyncio
     async def test_peak_rss_updated_by_watchdog(self, monkeypatch):
-        monkeypatch.setattr(_server, "ROCQ_MAX_PET_RSS_MB", 100_000)
+        monkeypatch.setattr(_config, "ROCQ_MAX_PET_RSS_MB", 100_000)
         _patch_psutil_rss(monkeypatch, 256)
 
         mock_pet = _mock_pet()
         ls = _fresh_lifespan_state()
         ls["pet_client"] = mock_pet
-        monkeypatch.setattr(_server, "_ensure_pet", lambda lstate: mock_pet)
+        monkeypatch.setattr(_pet_runtime, "_ensure_pet", lambda lstate: mock_pet)
 
         def fn(pet):
             time.sleep(0.05)
@@ -401,14 +403,14 @@ class TestPeakRss:
 class TestRecentErrors:
     @pytest.mark.asyncio
     async def test_recent_errors_records_timeout(self, monkeypatch):
-        monkeypatch.setattr(_server, "ROCQ_MAX_PET_RSS_MB", 1_000_000)
+        monkeypatch.setattr(_config, "ROCQ_MAX_PET_RSS_MB", 1_000_000)
         _patch_psutil_rss(monkeypatch, 1)
 
         mock_pet = _mock_pet()
         ls = _fresh_lifespan_state()
         ls["pet_client"] = mock_pet
         ls["pet_timeout"] = 0.05  # very short
-        monkeypatch.setattr(_server, "_ensure_pet", lambda lstate: mock_pet)
+        monkeypatch.setattr(_pet_runtime, "_ensure_pet", lambda lstate: mock_pet)
         monkeypatch.setattr(
             _server,
             "_invalidate_pet",
@@ -431,13 +433,13 @@ class TestRecentErrors:
 
     @pytest.mark.asyncio
     async def test_recent_errors_records_memory_abort(self, monkeypatch):
-        monkeypatch.setattr(_server, "ROCQ_MAX_PET_RSS_MB", 100)
+        monkeypatch.setattr(_config, "ROCQ_MAX_PET_RSS_MB", 100)
         _patch_psutil_rss(monkeypatch, 500)  # > 100
 
         mock_pet = _mock_pet()
         ls = _fresh_lifespan_state()
         ls["pet_client"] = mock_pet
-        monkeypatch.setattr(_server, "_ensure_pet", lambda lstate: mock_pet)
+        monkeypatch.setattr(_pet_runtime, "_ensure_pet", lambda lstate: mock_pet)
         monkeypatch.setattr(
             _server,
             "_invalidate_pet",
@@ -461,14 +463,14 @@ class TestRecentErrors:
     @pytest.mark.asyncio
     async def test_recent_errors_records_lock_contention(self, monkeypatch):
         """A held lock surfaces ``lock_contended`` and is recorded."""
-        monkeypatch.setattr(_server, "ROCQ_MAX_PET_RSS_MB", 1_000_000)
+        monkeypatch.setattr(_config, "ROCQ_MAX_PET_RSS_MB", 1_000_000)
         _patch_psutil_rss(monkeypatch, 1)
 
         mock_pet = _mock_pet()
         ls = _fresh_lifespan_state()
         ls["pet_client"] = mock_pet
         ls["pet_timeout"] = 0.1
-        monkeypatch.setattr(_server, "_ensure_pet", lambda lstate: mock_pet)
+        monkeypatch.setattr(_pet_runtime, "_ensure_pet", lambda lstate: mock_pet)
 
         # Hold the pet lock from another thread so the worker times out
         # acquiring it.
@@ -478,7 +480,7 @@ class TestRecentErrors:
         release = threading.Event()
 
         def _hog():
-            with _server._pet_lock:
+            with _pet_runtime._pet_lock:
                 held.set()
                 release.wait(timeout=1.0)
 
@@ -507,13 +509,13 @@ class TestRecentErrors:
         except ImportError:
             pytest.skip("pytanque not installed")
 
-        monkeypatch.setattr(_server, "ROCQ_MAX_PET_RSS_MB", 1_000_000)
+        monkeypatch.setattr(_config, "ROCQ_MAX_PET_RSS_MB", 1_000_000)
         _patch_psutil_rss(monkeypatch, 1)
 
         mock_pet = _mock_pet(alive=True)
         ls = _fresh_lifespan_state()
         ls["pet_client"] = mock_pet
-        monkeypatch.setattr(_server, "_ensure_pet", lambda lstate: mock_pet)
+        monkeypatch.setattr(_pet_runtime, "_ensure_pet", lambda lstate: mock_pet)
 
         def fn_raises(pet):
             raise PetanqueError(1, "Tactic failed")
@@ -530,7 +532,7 @@ class TestRecentErrors:
     @pytest.mark.asyncio
     async def test_recent_errors_ring_buffer_caps_at_max(self):
         ls = _fresh_lifespan_state()
-        cap = _server._RECENT_ERRORS_MAX
+        cap = _config._RECENT_ERRORS_MAX
         # Push five more than the cap so we can verify oldest entries drop.
         n = cap + 5
         for i in range(n):
@@ -733,12 +735,12 @@ class TestRecentErrorsCrashPaths:
 
     @pytest.mark.asyncio
     async def test_recent_errors_records_broken_pipe(self, monkeypatch):
-        monkeypatch.setattr(_server, "ROCQ_MAX_PET_RSS_MB", 1_000_000)
+        monkeypatch.setattr(_config, "ROCQ_MAX_PET_RSS_MB", 1_000_000)
         _patch_psutil_rss(monkeypatch, 1)
         mock_pet = _mock_pet()
         ls = _fresh_lifespan_state()
         ls["pet_client"] = mock_pet
-        monkeypatch.setattr(_server, "_ensure_pet", lambda lstate: mock_pet)
+        monkeypatch.setattr(_pet_runtime, "_ensure_pet", lambda lstate: mock_pet)
         monkeypatch.setattr(
             _server,
             "_invalidate_pet",
@@ -755,12 +757,12 @@ class TestRecentErrorsCrashPaths:
 
     @pytest.mark.asyncio
     async def test_recent_errors_records_file_not_found(self, monkeypatch):
-        monkeypatch.setattr(_server, "ROCQ_MAX_PET_RSS_MB", 1_000_000)
+        monkeypatch.setattr(_config, "ROCQ_MAX_PET_RSS_MB", 1_000_000)
         _patch_psutil_rss(monkeypatch, 1)
         mock_pet = _mock_pet()
         ls = _fresh_lifespan_state()
         ls["pet_client"] = mock_pet
-        monkeypatch.setattr(_server, "_ensure_pet", lambda lstate: mock_pet)
+        monkeypatch.setattr(_pet_runtime, "_ensure_pet", lambda lstate: mock_pet)
 
         def fn_fnf(pet):
             raise FileNotFoundError("pet binary missing")
@@ -773,12 +775,12 @@ class TestRecentErrorsCrashPaths:
 
     @pytest.mark.asyncio
     async def test_recent_errors_records_oserror(self, monkeypatch):
-        monkeypatch.setattr(_server, "ROCQ_MAX_PET_RSS_MB", 1_000_000)
+        monkeypatch.setattr(_config, "ROCQ_MAX_PET_RSS_MB", 1_000_000)
         _patch_psutil_rss(monkeypatch, 1)
         mock_pet = _mock_pet()
         ls = _fresh_lifespan_state()
         ls["pet_client"] = mock_pet
-        monkeypatch.setattr(_server, "_ensure_pet", lambda lstate: mock_pet)
+        monkeypatch.setattr(_pet_runtime, "_ensure_pet", lambda lstate: mock_pet)
 
         def fn_oserr(pet):
             raise OSError("disk full")
@@ -797,12 +799,12 @@ class TestRecentErrorsCrashPaths:
         except ImportError:
             pytest.skip("pytanque not installed")
 
-        monkeypatch.setattr(_server, "ROCQ_MAX_PET_RSS_MB", 1_000_000)
+        monkeypatch.setattr(_config, "ROCQ_MAX_PET_RSS_MB", 1_000_000)
         _patch_psutil_rss(monkeypatch, 1)
         mock_pet = _mock_pet(alive=False)  # poll() returns 1 -> dead
         ls = _fresh_lifespan_state()
         ls["pet_client"] = mock_pet
-        monkeypatch.setattr(_server, "_ensure_pet", lambda lstate: mock_pet)
+        monkeypatch.setattr(_pet_runtime, "_ensure_pet", lambda lstate: mock_pet)
         monkeypatch.setattr(
             _server,
             "_invalidate_pet",
