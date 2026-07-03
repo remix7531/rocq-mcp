@@ -404,8 +404,9 @@ class TestGetFileEndState:
 
     def test_no_trailing_newline_line_count(self, tmp_path):
         """File without trailing newline should still position past the last line."""
-        from rocq_mcp.interactive import _get_file_end_state
         from unittest.mock import MagicMock
+
+        from rocq_mcp.interactive import _get_file_end_state
 
         vfile = tmp_path / "test.v"
         vfile.write_text("Definition x := 1.")  # no trailing newline
@@ -425,8 +426,9 @@ class TestGetFileEndState:
 
     def test_with_trailing_newline_line_count(self, tmp_path):
         """File with trailing newline should position past the last line."""
-        from rocq_mcp.interactive import _get_file_end_state
         from unittest.mock import MagicMock
+
+        from rocq_mcp.interactive import _get_file_end_state
 
         vfile = tmp_path / "test.v"
         vfile.write_text("Definition x := 1.\n")
@@ -445,8 +447,9 @@ class TestGetFileEndState:
 
     def test_empty_file_line_count(self, tmp_path):
         """Empty file should position at line 1."""
-        from rocq_mcp.interactive import _get_file_end_state
         from unittest.mock import MagicMock
+
+        from rocq_mcp.interactive import _get_file_end_state
 
         vfile = tmp_path / "test.v"
         vfile.write_text("")
@@ -469,8 +472,9 @@ class TestGetFileEndState:
         The previous eager-reset behaviour thrashed pet across sibling
         calls on the same project for no Rocq-semantic benefit
         (coq-lsp re-reads the .v file on every get_state_at_pos)."""
-        from rocq_mcp.interactive import _get_file_end_state
         from unittest.mock import MagicMock
+
+        from rocq_mcp.interactive import _get_file_end_state
 
         vfile = tmp_path / "test.v"
         vfile.write_text("Definition x := 1.\n")
@@ -488,8 +492,9 @@ class TestGetFileEndState:
 
     def test_permission_error_gives_clean_message(self, tmp_path):
         """PermissionError should not leak the resolved absolute path."""
-        from rocq_mcp.interactive import _get_file_end_state
         from unittest.mock import MagicMock, patch
+
+        from rocq_mcp.interactive import _get_file_end_state
 
         vfile = tmp_path / "secret.v"
         vfile.write_text("Definition x := 1.\n")
@@ -569,9 +574,9 @@ class TestRocqQueryWrapper:
     @pytest.mark.asyncio
     async def test_params_forwarded(self, monkeypatch, tmp_path):
         """Wrapper should forward all params to run_query."""
+        import rocq_mcp.server as _server
         from rocq_mcp.server import rocq_query
         from tests.conftest import _MockContext
-        import rocq_mcp.server as _server
 
         captured = {}
 
@@ -605,9 +610,9 @@ class TestRocqQueryWrapper:
 # ---------------------------------------------------------------------------
 
 
-import rocq_mcp.server as _server
-from rocq_mcp.server import rocq_query
-from tests.conftest import _MockContext
+import rocq_mcp.server as _server  # noqa: E402  (section-local import block)
+from rocq_mcp.server import rocq_query  # noqa: E402
+from tests.conftest import _MockContext  # noqa: E402
 
 
 class TestQueryTimeoutRunQuery:
@@ -743,8 +748,9 @@ class TestQueryFromStateUnit(_MockPetBase):
     @pytest.mark.asyncio
     async def test_from_state_routes_to_state_lookup(self, monkeypatch):
         """from_state should call _state_get_or_error, not _get_or_create_import_state."""
-        import rocq_mcp.interactive as _interactive
         from unittest.mock import MagicMock
+
+        import rocq_mcp.interactive as _interactive
 
         # Insert a fake state into the table
         from rocq_mcp.interactive import _state_add
@@ -808,8 +814,9 @@ class TestQueryFromStateUnit(_MockPetBase):
     @pytest.mark.asyncio
     async def test_from_state_with_evicted_state_returns_error(self, monkeypatch):
         """If state was evicted, return a clear error pointing to rocq_start."""
-        import rocq_mcp.interactive as _interactive
         from unittest.mock import MagicMock
+
+        import rocq_mcp.interactive as _interactive
 
         # Force _state_get_or_error to return an "expired" error.
         def fake_lookup(state_id):
@@ -842,8 +849,9 @@ class TestQueryFromStateUnit(_MockPetBase):
     @pytest.mark.asyncio
     async def test_from_state_nonexistent_returns_error(self, monkeypatch):
         """If state was never created, return the helper's error verbatim."""
-        import rocq_mcp.interactive as _interactive
         from unittest.mock import MagicMock
+
+        import rocq_mcp.interactive as _interactive
 
         def fake_lookup(state_id):
             return None, f"State {state_id} does not exist."
@@ -873,8 +881,9 @@ class TestQueryFromStateUnit(_MockPetBase):
     @pytest.mark.asyncio
     async def test_from_state_does_not_advance_state(self, monkeypatch):
         """The transient query state must NOT be added to the state table."""
-        from rocq_mcp.interactive import _state_add, _state_table
         from unittest.mock import MagicMock
+
+        from rocq_mcp.interactive import _state_add, _state_table
 
         fake_pet_state = MagicMock()
         fake_pet_state.proof_finished = False
@@ -960,8 +969,9 @@ class TestQueryFromStateValidation(_MockPetBase):
     @pytest.mark.asyncio
     async def test_from_state_with_blank_preamble_allowed(self, monkeypatch):
         """Whitespace-only preamble + from_state is fine (no information conveyed)."""
-        from rocq_mcp.interactive import _state_add
         from unittest.mock import MagicMock
+
+        from rocq_mcp.interactive import _state_add
 
         fake_pet_state = MagicMock()
         fake_pet_state.proof_finished = False
@@ -1095,7 +1105,7 @@ class TestQueryFromStateIntegration:
     @pytest.mark.asyncio
     async def test_from_state_does_not_mutate_parent(self, workspace, lifespan_state):
         """Querying via from_state must not mutate the parent state's pet state."""
-        from rocq_mcp.interactive import run_start, _state_table
+        from rocq_mcp.interactive import _state_table, run_start
 
         start = await run_start(
             file="",
@@ -1199,8 +1209,8 @@ class TestLspSeverityWire:
     @pytest.mark.asyncio
     async def test_warning_level_is_lsp_severity_2(self, workspace, lifespan_state):
         """Direct pet probe: state.feedback for a deprecation must be (2, msg)."""
-        from rocq_mcp.server import _ensure_pet, _set_workspace_if_needed
         from rocq_mcp.interactive import _get_or_create_import_state
+        from rocq_mcp.server import _ensure_pet, _set_workspace_if_needed
 
         pet = _ensure_pet(lifespan_state)
         _set_workspace_if_needed(pet, str(workspace), lifespan_state)

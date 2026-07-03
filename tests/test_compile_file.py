@@ -3,16 +3,16 @@
 from __future__ import annotations
 
 import asyncio
-import glob as glob_mod
+
 import pytest
 
+from rocq_mcp.compile import run_compile_file
 from tests.conftest import (
     COQC_AVAILABLE,
-    _MockContext,
     _fake_coqc_result,
+    _MockContext,
     make_lifespan_state,
 )
-from rocq_mcp.compile import run_compile_file
 
 pytestmark = pytest.mark.skipif(not COQC_AVAILABLE, reason="coqc not available")
 

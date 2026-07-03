@@ -520,9 +520,9 @@ class TestRocqAssumptionsWrapper:
     @pytest.mark.asyncio
     async def test_params_forwarded(self, monkeypatch, tmp_path):
         """Wrapper should forward all params to run_assumptions."""
+        import rocq_mcp.server as _server
         from rocq_mcp.server import rocq_assumptions
         from tests.conftest import _MockContext
-        import rocq_mcp.server as _server
 
         captured = {}
 
@@ -549,9 +549,9 @@ class TestRocqAssumptionsWrapper:
     @pytest.mark.asyncio
     async def test_timeout_above_cap_clamped_with_signal(self, monkeypatch, tmp_path):
         """Wrapper clamps an over-cap timeout and echoes ``clamped_timeout``."""
+        import rocq_mcp.server as _server
         from rocq_mcp.server import rocq_assumptions
         from tests.conftest import _MockContext
-        import rocq_mcp.server as _server
 
         captured: dict = {}
 
@@ -800,6 +800,7 @@ class TestAssumptionsAvailableInFile:
         (the generic reason ``_run_with_pet`` sets on Coq errors).
         """
         from collections import deque
+
         import rocq_mcp.interactive as _int
 
         async def mock_run_query(**kwargs):
@@ -852,6 +853,7 @@ class TestAssumptionsAvailableInFile:
         the right tool / reason attribution.  The mock therefore does
         NOT pre-populate any buffer entry on its own."""
         from collections import deque
+
         import rocq_mcp.interactive as _int
 
         async def mock_run_query(**kwargs):
@@ -897,6 +899,7 @@ class TestAssumptionsAvailableInFile:
         double-record into the recent_errors buffer.  Idempotency check.
         """
         from collections import deque
+
         import rocq_mcp.interactive as _int
 
         async def mock_run_query(**kwargs):
@@ -946,8 +949,9 @@ class TestCollectTocNames:
         assert _collect_toc_names(None) == []
 
     def test_flattens_nested_children(self):
-        from rocq_mcp.interactive import _collect_toc_names
         from types import SimpleNamespace
+
+        from rocq_mcp.interactive import _collect_toc_names
 
         def _e(name, children=None):
             return SimpleNamespace(
@@ -972,8 +976,9 @@ class TestCollectTocNames:
         assert set(names) == {"a", "b", "b_inner1", "b_inner2", "c"}
 
     def test_skips_unnamed_but_recurses(self):
-        from rocq_mcp.interactive import _collect_toc_names
         from types import SimpleNamespace
+
+        from rocq_mcp.interactive import _collect_toc_names
 
         unnamed = SimpleNamespace(
             name=None,
@@ -996,8 +1001,9 @@ class TestCollectTocNames:
     def test_filters_notation_entries(self):
         """Notation/Infix entries have syntax keys (`x + y`) as names —
         useless as `name=` arguments, must be dropped."""
-        from rocq_mcp.interactive import _collect_toc_names
         from types import SimpleNamespace
+
+        from rocq_mcp.interactive import _collect_toc_names
 
         def _e(name, detail):
             return SimpleNamespace(
@@ -1025,8 +1031,9 @@ class TestCollectTocNames:
     def test_qualifies_module_children_when_source_given(self):
         """When a Rocq source is provided, definitions inside Module M get
         qualified as ``M.foo`` so the agent can address them."""
-        from rocq_mcp.interactive import _collect_toc_names
         from types import SimpleNamespace
+
+        from rocq_mcp.interactive import _collect_toc_names
 
         def _e(name, line):
             r = SimpleNamespace(
@@ -1069,8 +1076,9 @@ class TestCollectTocNames:
     def test_section_children_not_qualified(self):
         """Coq sections do NOT introduce a namespace qualifier — Section
         members must be emitted as bare names."""
-        from rocq_mcp.interactive import _collect_toc_names
         from types import SimpleNamespace
+
+        from rocq_mcp.interactive import _collect_toc_names
 
         def _e(name, line):
             r = SimpleNamespace(
@@ -1094,8 +1102,9 @@ class TestCollectTocNames:
     def test_module_type_also_qualifies(self):
         """Module Type members are addressable as MT.foo from outside,
         so they MUST be qualified."""
-        from rocq_mcp.interactive import _collect_toc_names
         from types import SimpleNamespace
+
+        from rocq_mcp.interactive import _collect_toc_names
 
         def _e(name, line, detail="Parameter"):
             r = SimpleNamespace(
@@ -1120,8 +1129,9 @@ class TestCollectTocNames:
         """A 'Module X.' inside a comment must NOT open a region — the
         comment scrubber preserves line numbers so subsequent ranges
         still align correctly."""
-        from rocq_mcp.interactive import _collect_toc_names
         from types import SimpleNamespace
+
+        from rocq_mcp.interactive import _collect_toc_names
 
         def _e(name, line):
             r = SimpleNamespace(
@@ -1153,8 +1163,9 @@ class TestCollectTocNames:
         the top), or ``Outer`` is silently dropped from regions and
         ``Sibling.x`` ends up qualified bare instead of as
         ``Outer.Sibling.x``."""
-        from rocq_mcp.interactive import _collect_toc_names
         from types import SimpleNamespace
+
+        from rocq_mcp.interactive import _collect_toc_names
 
         def _e(name, line):
             r = SimpleNamespace(
@@ -1190,8 +1201,9 @@ class TestCollectTocNames:
     def test_module_assignment_one_liner_no_corruption(self):
         """Same bug class via ``Module M := SomeMod.`` (functor application
         / module aliasing).  Also has no body and no ``End``."""
-        from rocq_mcp.interactive import _collect_toc_names
         from types import SimpleNamespace
+
+        from rocq_mcp.interactive import _collect_toc_names
 
         def _e(name, line):
             r = SimpleNamespace(
@@ -1223,8 +1235,9 @@ class TestCollectTocNames:
     def test_top_level_one_liner_does_not_break_subsequent_regions(self):
         """A declarative one-liner at the top level leaks onto the open
         stack but should not corrupt any subsequent module's qualifier."""
-        from rocq_mcp.interactive import _collect_toc_names
         from types import SimpleNamespace
+
+        from rocq_mcp.interactive import _collect_toc_names
 
         def _e(name, line):
             r = SimpleNamespace(

@@ -201,9 +201,9 @@ class TestRocqTocTimeout:
 
     @pytest.mark.asyncio
     async def test_above_cap_clamped_with_signal(self, monkeypatch, tmp_path):
+        import rocq_mcp.server as _server
         from rocq_mcp.server import rocq_toc
         from tests.conftest import _MockContext
-        import rocq_mcp.server as _server
 
         captured: dict = {}
 

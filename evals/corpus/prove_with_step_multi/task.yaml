@@ -1,0 +1,32 @@
+id: prove_with_step_multi
+kind: prove
+tags: [step-multi, automation]
+prompt: |
+  The file {workspace}/AddComm.v states `Theorem my_add_comm : forall
+  n m : nat, n + m = m + n.` and ends it with `Admitted.`. Use
+  rocq_step_multi to discover an automation tactic that closes the goal
+  in one step, commit it with rocq_check, write the finished proof into
+  the file, and confirm it compiles.
+entry_file: AddComm.v
+budget:
+  max_tool_calls: 20
+  max_wall_s: 240
+check:
+  - tool: rocq_compile_file
+    args:
+      file: "{workspace}/AddComm.v"
+      workspace: "{workspace}"
+    expect:
+      success: true
+  - tool: rocq_verify
+    args:
+      proof: "@AddComm.v"
+      problem_name: my_add_comm
+      problem_statement: |
+        From Coq Require Import Lia.
+
+        Theorem my_add_comm : forall n m : nat, n + m = m + n.
+        Admitted.
+      workspace: "{workspace}"
+    expect:
+      success: true

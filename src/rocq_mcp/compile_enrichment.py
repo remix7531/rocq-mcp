@@ -21,8 +21,7 @@ from rocq_mcp.compile import (
     run_compile,
     run_compile_file,
 )
-
-from rocq_mcp.proof_walk import ProofError, collect_file_errors
+from rocq_mcp.proof_walk import collect_file_errors
 
 # Cap on how long enrichment may spend per call.  Coqc has already returned
 # the basic error by the time we reach this code, so a stuck pet must not
@@ -314,7 +313,7 @@ async def _multi_error_walk(
     ``ProofError`` entries are.
     """
     try:
-        with open(resolved_file, "r", encoding="utf-8") as f:
+        with open(resolved_file, encoding="utf-8") as f:
             source_text = f.read()
     except OSError:
         return None

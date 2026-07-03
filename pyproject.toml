@@ -14,7 +14,10 @@ dependencies = [
 dev = [
     "pytest>=8.0",
     "pytest-asyncio>=0.25",
+    "pytest-timeout>=2.3",
     "black>=24.0",
+    "ruff>=0.8",
+    "pyyaml>=6.0",
 ]
 
 [project.scripts]
@@ -30,3 +33,34 @@ where = ["src"]
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+# Hang protection: this codebase drives subprocesses (coqc, pet) and holds
+# locks across threads — a wedged call must fail the test, not the CI job.
+# Real-toolchain integration files override with @pytest.mark.timeout(300).
+addopts = "--timeout=120 --timeout-method=thread"
+
+[tool.ruff]
+target-version = "py311"
+line-length = 88
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "W", "F", "I", "UP", "B", "ASYNC", "RUF"]
+ignore = [
+    "E501",     # line length is black's job; docstrings routinely exceed it
+    "B904",     # raise-without-from inside except: pre-existing style, revisit
+    "ASYNC109", # timeout= params on async tools are part of the MCP tool contract
+    # Pre-existing blocking file/subprocess I/O inside async tool bodies.
+    # Real findings, but fixing them means threading work through
+    # asyncio.to_thread — tracked for the pet_runtime/tools split.
+    "ASYNC221",
+    "ASYNC230",
+    "ASYNC240",
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Test classes use plain class-attribute fixtures/pytestmark lists and
+# loose pytest.raises match strings; not worth churning.
+"tests/*" = ["RUF012", "RUF043"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["rocq_mcp"]

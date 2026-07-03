@@ -9,8 +9,8 @@ from __future__ import annotations
 
 import pytest
 
-import rocq_mcp.server as _server
 import rocq_mcp.interactive as _int
+import rocq_mcp.server as _server
 from tests.conftest import _MockPetBase, make_lifespan_state
 
 

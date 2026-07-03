@@ -233,9 +233,10 @@ class TestPetSideEnvelope:
     async def test_live_petanque_error_envelope(self, monkeypatch):
         """A PetanqueError with pet still alive: ``reason=crashed``,
         no ``pet_restarted``."""
+        from pytanque import PetanqueError
+
         import rocq_mcp.server as _server
         from rocq_mcp.server import _run_with_pet
-        from pytanque import PetanqueError
 
         monkeypatch.setattr(_server, "ROCQ_MAX_PET_RSS_MB", 1_000_000)
         patch_psutil_rss(monkeypatch, 1)
@@ -257,9 +258,10 @@ class TestPetSideEnvelope:
     async def test_dead_petanque_error_envelope(self, monkeypatch):
         """PetanqueError with pet dead (poll() != None): ``reason=crashed``,
         ``pet_restarted=True``."""
+        from pytanque import PetanqueError
+
         import rocq_mcp.server as _server
         from rocq_mcp.server import _run_with_pet
-        from pytanque import PetanqueError
 
         monkeypatch.setattr(_server, "ROCQ_MAX_PET_RSS_MB", 1_000_000)
         patch_psutil_rss(monkeypatch, 1)
@@ -327,6 +329,7 @@ class TestPetSideEnvelope:
     async def test_pytanque_unavailable_envelope(self, monkeypatch):
         """ImportError on pytanque: ``reason=unavailable``."""
         import sys
+
         from rocq_mcp.server import _run_with_pet
 
         monkeypatch.setitem(sys.modules, "pytanque", None)

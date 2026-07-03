@@ -36,8 +36,6 @@ try:
 except ImportError:  # pragma: no cover - pytanque optional
     _PetanqueError = None  # type: ignore[assignment, misc]
 
-from rocq_mcp.verify import _check_forbidden_commands
-
 # Imports from server.py — these are all defined before server.py imports
 # interactive, so the circular import resolves cleanly.
 # NOTE: _pet_lock is accessed via module reference (_server._pet_lock)
@@ -46,7 +44,8 @@ from rocq_mcp.verify import _check_forbidden_commands
 import rocq_mcp.server as _server
 
 # _split_rocq_sentences is in compile — import directly (no cycle).
-from rocq_mcp.compile import _split_rocq_sentences, _is_focus_token
+from rocq_mcp.compile import _is_focus_token, _split_rocq_sentences
+from rocq_mcp.verify import _check_forbidden_commands
 
 # ---------------------------------------------------------------------------
 # Goal formatting helper (shared by run_check, run_step_multi)
@@ -337,7 +336,7 @@ class _StateEntry:
 # least-recently-used end.  Keeps actively-used states alive even when
 # a parallel caller is churning through fresh states (e.g. two sub-agents
 # on different files sharing one rocq-mcp process).
-_state_table: "OrderedDict[int, _StateEntry]" = OrderedDict()
+_state_table: OrderedDict[int, _StateEntry] = OrderedDict()
 _state_next_id: int = 1
 
 
@@ -423,7 +422,7 @@ def _state_invalidate_all() -> None:
 
 def _resolve_check_base_state(
     from_state: int,
-) -> tuple["_StateEntry | None", int | None, str | None]:
+) -> tuple[_StateEntry | None, int | None, str | None]:
     """Resolve the base state for ``run_check`` / friends.
 
     Returns ``(entry, base_state_id, error_message)``.  Exactly one of
@@ -833,7 +832,7 @@ async def run_assumptions(
     # Strip the opaque-proof loader notices that Coq emits before the
     # actual ``Print Assumptions`` output.  On mathcomp-flavored proofs
     # they can outweigh the answer 20:1 ("Fetching opaque proofs from disk
-    # for mathcomp.X..." × dozens of files), pushing the Axioms: block
+    # for mathcomp.X..." x dozens of files), pushing the Axioms: block
     # past response-truncation thresholds.  Pure cosmetic strip; the lines
     # are Notice-level feedback, never part of the assumptions list.
     raw_output = _OPAQUE_FETCH_NOTICE_RE.sub("", query_result["output"])

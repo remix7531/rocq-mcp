@@ -36,29 +36,29 @@ import glob as glob_mod
 
 import pytest
 
-from tests.conftest import COQC_AVAILABLE
 from rocq_mcp.verify import (
+    _SHARED_DEF_DETAILS,
+    DefCategory,
+    DefinitionInfo,
+    ProblemStructure,
+    _axiom_short_name,
     _check_forbidden_commands,
     _clean_problem_statement,
     _is_standard_axiom,
-    _axiom_short_name,
     _parse_assumptions_raw,
-    _SHARED_DEF_DETAILS,
     _strip_shared_defs,
     _validate_rocq_identifier,
     build_direct_type_check_source,
     build_direct_verification_source,
     build_shared_defs_verification_source,
+    build_verification_source,
     classify_toc_detail,
-    DefCategory,
-    DefinitionInfo,
     normalize_type_for_comparison,
     parse_and_classify_assumptions,
     parse_check_type,
-    ProblemStructure,
-    build_verification_source,
     verification_hint,
 )
+from tests.conftest import COQC_AVAILABLE
 
 # =========================================================================
 # PART A: Unit tests (no coqc needed)
@@ -2708,8 +2708,8 @@ class TestVerifyEnvelopeContract:
         must skip its own _record_error when ``pet_restarted`` is set."""
         from collections import deque
 
-        from rocq_mcp.server import rocq_verify
         import rocq_mcp.server as _server
+        from rocq_mcp.server import rocq_verify
         from tests.conftest import _MockContext
 
         # Pre-populate the buffer with the entry _run_with_pet would

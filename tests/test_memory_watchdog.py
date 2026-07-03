@@ -16,7 +16,6 @@ from __future__ import annotations
 
 import asyncio
 import time
-from unittest.mock import MagicMock
 
 import pytest
 
@@ -26,12 +25,16 @@ from rocq_mcp.server import _run_with_pet
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
-
-
 from tests.conftest import (
     FakePsutilProcess as _FakePsutilProcess,
+)
+from tests.conftest import (
     make_lifespan_state,
+)
+from tests.conftest import (
     mock_pet as _mock_pet,
+)
+from tests.conftest import (
     patch_psutil_rss as _patch_psutil_rss,
 )
 

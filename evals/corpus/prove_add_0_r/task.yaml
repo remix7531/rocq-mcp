@@ -1,0 +1,32 @@
+id: prove_add_0_r
+kind: prove
+tags: [induction, stdlib-free]
+prompt: |
+  The file {workspace}/Add0r.v states `Theorem add_0_r : forall n : nat,
+  n + 0 = n.` and ends it with `Admitted.`. Using the rocq-mcp tools,
+  develop a real proof interactively (rocq_start + rocq_check), then
+  replace the Admitted with your proof in the file and confirm the file
+  compiles with rocq_compile_file.
+entry_file: Add0r.v
+budget:
+  max_tool_calls: 25
+  max_wall_s: 300
+check:
+  - tool: rocq_compile_file
+    args:
+      file: "{workspace}/Add0r.v"
+      workspace: "{workspace}"
+    expect:
+      success: true
+  - tool: rocq_verify
+    args:
+      proof: "@Add0r.v"
+      problem_name: add_0_r
+      problem_statement: |
+        From Coq Require Import Arith.
+
+        Theorem add_0_r : forall n : nat, n + 0 = n.
+        Admitted.
+      workspace: "{workspace}"
+    expect:
+      success: true

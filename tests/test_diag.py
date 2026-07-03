@@ -24,10 +24,13 @@ from rocq_mcp.server import (
 )
 from tests.conftest import (
     _MockContext,
-    FakePsutilProcess as _FakePsutilProcess,
     add_mock_state,
     make_lifespan_state,
+)
+from tests.conftest import (
     mock_pet as _mock_pet,
+)
+from tests.conftest import (
     patch_psutil_rss as _patch_psutil_rss,
 )
 

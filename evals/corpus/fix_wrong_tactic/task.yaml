@@ -1,0 +1,32 @@
+id: fix_wrong_tactic
+kind: fix
+tags: [compile-error-recovery, induction]
+prompt: |
+  The file {workspace}/Broken.v does not compile: the proof of
+  `add_0_r_broken` uses a tactic that cannot close the goal. Use
+  rocq_compile_file to see the failure, recover the proof state at the
+  error (or restart the theorem with rocq_start), find a working proof
+  with rocq_check, fix the file, and confirm it compiles.
+entry_file: Broken.v
+budget:
+  max_tool_calls: 30
+  max_wall_s: 300
+check:
+  - tool: rocq_compile_file
+    args:
+      file: "{workspace}/Broken.v"
+      workspace: "{workspace}"
+    expect:
+      success: true
+  - tool: rocq_verify
+    args:
+      proof: "@Broken.v"
+      problem_name: add_0_r_broken
+      problem_statement: |
+        From Coq Require Import Arith.
+
+        Theorem add_0_r_broken : forall n : nat, n + 0 = n.
+        Admitted.
+      workspace: "{workspace}"
+    expect:
+      success: true

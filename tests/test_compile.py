@@ -12,18 +12,19 @@ from __future__ import annotations
 
 import asyncio
 import glob as glob_mod
+
 import pytest
 
+from rocq_mcp.server import _PYTANQUE_NOT_INSTALLED_HINT, rocq_compile
 from tests.conftest import (
-    COQC_AVAILABLE,
     _DEFAULT_STDERR,
-    _MockContext,
+    COQC_AVAILABLE,
     _fake_coqc_result,
+    _MockContext,
     _patch_capture_position_state,
     _patch_compile_error,
     make_lifespan_state,
 )
-from rocq_mcp.server import _PYTANQUE_NOT_INSTALLED_HINT, rocq_compile
 
 pytestmark = pytest.mark.skipif(not COQC_AVAILABLE, reason="coqc not available")
 

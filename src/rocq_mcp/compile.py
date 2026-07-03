@@ -17,29 +17,28 @@ import time
 from pathlib import Path
 from typing import Any
 
-from rocq_mcp.verify import (
-    _check_forbidden_commands,
-    _rocq_scan,
-    build_verification_source,
-    build_shared_defs_verification_source,
-    build_direct_verification_source,
-    build_direct_type_check_source,
-    parse_check_type,
-    normalize_type_for_comparison,
-    classify_toc_detail,
-    DefCategory,
-    DefinitionInfo,
-    parse_and_classify_assumptions,
-    ProblemStructure,
-    verification_hint,
-    _validate_rocq_identifier,
-)
-
 # Access server attributes through the module reference so that
 # monkeypatching ``rocq_mcp.server.ROCQ_COQC_BINARY`` (or _run_coqc,
 # etc.) in tests is visible here.  A bare ``from server import X``
 # would capture the value at import time, defeating monkeypatch.
 import rocq_mcp.server as _server
+from rocq_mcp.verify import (
+    DefCategory,
+    DefinitionInfo,
+    ProblemStructure,
+    _check_forbidden_commands,
+    _rocq_scan,
+    _validate_rocq_identifier,
+    build_direct_type_check_source,
+    build_direct_verification_source,
+    build_shared_defs_verification_source,
+    build_verification_source,
+    classify_toc_detail,
+    normalize_type_for_comparison,
+    parse_and_classify_assumptions,
+    parse_check_type,
+    verification_hint,
+)
 
 # ---------------------------------------------------------------------------
 # Constants

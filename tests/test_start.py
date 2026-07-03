@@ -11,8 +11,6 @@ the position-based tests from test_step_at_pos.py.
 
 from __future__ import annotations
 
-from pathlib import Path
-
 import pytest
 
 from tests.conftest import PET_AVAILABLE, _MockPetBase
@@ -401,8 +399,8 @@ class TestStartProofFinished(_MockPetBase):
         from types import SimpleNamespace
         from unittest.mock import MagicMock, patch
 
-        import rocq_mcp.server
         import rocq_mcp.interactive as _interactive
+        import rocq_mcp.server
 
         mock_state = SimpleNamespace(st=42, proof_finished=False, feedback=[])
         mock_pet = MagicMock()
@@ -441,8 +439,8 @@ class TestStartProofFinished(_MockPetBase):
         from types import SimpleNamespace
         from unittest.mock import MagicMock, patch
 
-        import rocq_mcp.server
         import rocq_mcp.interactive as _interactive
+        import rocq_mcp.server
 
         mock_state = SimpleNamespace(st=42, proof_finished=True, feedback=[])
         mock_pet = MagicMock()
@@ -481,8 +479,8 @@ class TestStartProofFinished(_MockPetBase):
         from types import SimpleNamespace
         from unittest.mock import MagicMock, patch
 
-        import rocq_mcp.server
         import rocq_mcp.interactive as _interactive
+        import rocq_mcp.server
 
         mock_state = SimpleNamespace(st=42, proof_finished=False, feedback=[])
         mock_pet = MagicMock()
@@ -523,8 +521,8 @@ class TestStartProofFinished(_MockPetBase):
         from types import SimpleNamespace
         from unittest.mock import MagicMock, patch
 
-        import rocq_mcp.server
         import rocq_mcp.interactive as _interactive
+        import rocq_mcp.server
 
         mock_state = SimpleNamespace(st=42, proof_finished=True, feedback=[])
         mock_pet = MagicMock()
@@ -564,8 +562,8 @@ class TestStartProofFinished(_MockPetBase):
         from types import SimpleNamespace
         from unittest.mock import MagicMock, patch
 
-        import rocq_mcp.server
         import rocq_mcp.interactive as _interactive
+        import rocq_mcp.server
 
         mock_state = SimpleNamespace(st=42, proof_finished=False, feedback=[])
         mock_pet = MagicMock()
@@ -611,8 +609,8 @@ class TestForceRestart(_MockPetBase):
         from types import SimpleNamespace
         from unittest.mock import MagicMock, patch
 
-        import rocq_mcp.server
         import rocq_mcp.interactive as _interactive
+        import rocq_mcp.server
 
         mock_state = SimpleNamespace(st=42, proof_finished=False, feedback=[])
         mock_pet = MagicMock()
@@ -655,8 +653,8 @@ class TestForceRestart(_MockPetBase):
         from types import SimpleNamespace
         from unittest.mock import MagicMock, patch
 
-        import rocq_mcp.server
         import rocq_mcp.interactive as _interactive
+        import rocq_mcp.server
 
         mock_state = SimpleNamespace(st=42, proof_finished=False, feedback=[])
         mock_pet = MagicMock()
@@ -699,8 +697,8 @@ class TestForceRestart(_MockPetBase):
         from types import SimpleNamespace
         from unittest.mock import MagicMock, patch
 
-        import rocq_mcp.server
         import rocq_mcp.interactive as _interactive
+        import rocq_mcp.server
         from rocq_mcp.interactive import _state_table
 
         mock_state = SimpleNamespace(st=42, proof_finished=False, feedback=[])
@@ -772,6 +770,7 @@ def _make_failing_pet(toc_return):
     whose ``toc`` returns *toc_return*.
     """
     from unittest.mock import MagicMock
+
     from pytanque import PetanqueError
 
     mock_pet = MagicMock()
@@ -820,8 +819,8 @@ class TestStartNotFoundAvailableInFile(_MockPetBase):
     async def test_not_found_attaches_available_in_file(self, failing_pet_workspace):
         from unittest.mock import patch
 
-        import rocq_mcp.server
         import rocq_mcp.interactive as _interactive
+        import rocq_mcp.server
 
         ws, _ = failing_pet_workspace
         mock_pet = _make_failing_pet(
@@ -856,8 +855,8 @@ class TestStartNotFoundAvailableInFile(_MockPetBase):
         """The returned ``available_in_file`` list must be sorted."""
         from unittest.mock import patch
 
-        import rocq_mcp.server
         import rocq_mcp.interactive as _interactive
+        import rocq_mcp.server
 
         ws, _ = failing_pet_workspace
         # Insert names out-of-order so the only way the result is sorted
@@ -896,8 +895,8 @@ class TestStartNotFoundAvailableInFile(_MockPetBase):
         """
         from unittest.mock import patch
 
-        import rocq_mcp.server
         import rocq_mcp.interactive as _interactive
+        import rocq_mcp.server
 
         ws, _ = failing_pet_workspace
         names = [f"name_{i:04d}" for i in range(750)]
@@ -935,8 +934,8 @@ class TestStartNotFoundAvailableInFile(_MockPetBase):
         """
         from unittest.mock import patch
 
-        import rocq_mcp.server
         import rocq_mcp.interactive as _interactive
+        import rocq_mcp.server
 
         ws, _ = failing_pet_workspace
         names = [f"name_{i:03d}" for i in range(200)]
@@ -962,8 +961,8 @@ class TestStartNotFoundAvailableInFile(_MockPetBase):
         not ``"crashed"`` (which conflates pet death with name lookup)."""
         from unittest.mock import patch
 
-        import rocq_mcp.server
         import rocq_mcp.interactive as _interactive
+        import rocq_mcp.server
 
         ws, _ = failing_pet_workspace
         mock_pet = _make_failing_pet([("main", [_make_toc_elem("a")])])
@@ -984,8 +983,8 @@ class TestStartNotFoundAvailableInFile(_MockPetBase):
         """Two failures against the same file (same mtime) → pet.toc once."""
         from unittest.mock import patch
 
-        import rocq_mcp.server
         import rocq_mcp.interactive as _interactive
+        import rocq_mcp.server
 
         ws, _ = failing_pet_workspace
         mock_pet = _make_failing_pet(
@@ -1014,8 +1013,8 @@ class TestStartNotFoundAvailableInFile(_MockPetBase):
         import os
         from unittest.mock import patch
 
-        import rocq_mcp.server
         import rocq_mcp.interactive as _interactive
+        import rocq_mcp.server
 
         ws, test_file = failing_pet_workspace
         mock_pet = _make_failing_pet([("main", [_make_toc_elem("a")])])
@@ -1049,8 +1048,8 @@ class TestStartNotFoundAvailableInFile(_MockPetBase):
         """
         from unittest.mock import patch
 
-        import rocq_mcp.server
         import rocq_mcp.interactive as _interactive
+        import rocq_mcp.server
         from rocq_mcp.interactive import _TOC_CACHE
 
         ws, _ = failing_pet_workspace
@@ -1073,14 +1072,15 @@ class TestStartNotFoundAvailableInFile(_MockPetBase):
 
     def test_toc_cache_eviction_at_max(self):
         """Insert ``_TOC_CACHE_MAX + 1`` entries; oldest must be evicted."""
+        import os
+        import tempfile
+        from unittest.mock import MagicMock
+
         from rocq_mcp.interactive import (
             _TOC_CACHE,
             _TOC_CACHE_MAX,
             _toc_names_cached,
         )
-        import os
-        import tempfile
-        from unittest.mock import MagicMock
 
         _TOC_CACHE.clear()
         try:

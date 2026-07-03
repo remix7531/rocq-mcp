@@ -1,0 +1,19 @@
+id: find_lemma_add_comm
+kind: find_lemma
+tags: [search, stdlib]
+prompt: |
+  Using the rocq-mcp tools, find the name of the standard-library lemma
+  stating commutativity of addition on nat (forall n m, n + m = m + n).
+  Report the fully qualified name.
+entry_file: null
+budget:
+  max_tool_calls: 10
+  max_wall_s: 120
+check:
+  - tool: rocq_query
+    args:
+      preamble: "From Coq Require Import Arith."
+      command: "Search (_ + _ = _ + _)."
+    expect:
+      success: true
+      output_contains: "add_comm"

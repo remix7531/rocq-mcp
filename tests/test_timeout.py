@@ -9,14 +9,18 @@ import pytest
 
 import rocq_mcp.server as _server
 from rocq_mcp.interactive import (
-    _is_timeout_eligible,
-    _compute_hard_timeout,
     _PET_TIMEOUT_GRACE,
+    _compute_hard_timeout,
+    _is_timeout_eligible,
 )
 from rocq_mcp.server import _run_with_pet
 from tests.conftest import (
     make_lifespan_state,
+)
+from tests.conftest import (
     mock_pet as _mock_pet,
+)
+from tests.conftest import (
     patch_psutil_rss as _patch_psutil_rss,
 )
 

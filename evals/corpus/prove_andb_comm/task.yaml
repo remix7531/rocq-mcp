@@ -1,0 +1,30 @@
+id: prove_andb_comm
+kind: prove
+tags: [case-analysis, stdlib-free]
+prompt: |
+  The file {workspace}/AndbComm.v states `Theorem andb_comm_ev : forall
+  a b : bool, andb a b = andb b a.` and ends it with `Admitted.`. Prove
+  it interactively with the rocq-mcp tools (case analysis on the
+  booleans works), write the finished proof into the file, and confirm
+  the file compiles with rocq_compile_file.
+entry_file: AndbComm.v
+budget:
+  max_tool_calls: 20
+  max_wall_s: 240
+check:
+  - tool: rocq_compile_file
+    args:
+      file: "{workspace}/AndbComm.v"
+      workspace: "{workspace}"
+    expect:
+      success: true
+  - tool: rocq_verify
+    args:
+      proof: "@AndbComm.v"
+      problem_name: andb_comm_ev
+      problem_statement: |
+        Theorem andb_comm_ev : forall a b : bool, andb a b = andb b a.
+        Admitted.
+      workspace: "{workspace}"
+    expect:
+      success: true

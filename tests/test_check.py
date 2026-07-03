@@ -60,7 +60,7 @@ class TestCheckSingleTactic:
     @pytest.mark.asyncio
     async def test_single_tactic(self, workspace, lifespan_state):
         """Start a theorem, run one tactic, verify success and goals."""
-        from rocq_mcp.interactive import run_start, run_check
+        from rocq_mcp.interactive import run_check, run_start
 
         vfile = workspace / "check_single.v"
         vfile.write_text(
@@ -93,7 +93,7 @@ class TestCheckSingleTactic:
     @pytest.mark.asyncio
     async def test_proof_finished(self, workspace, lifespan_state):
         """Run a tactic that finishes the proof, verify proof_finished=True."""
-        from rocq_mcp.interactive import run_start, run_check
+        from rocq_mcp.interactive import run_check, run_start
 
         vfile = workspace / "check_finished.v"
         vfile.write_text("Theorem t : True.\nProof. exact I. Qed.\n")
@@ -118,7 +118,7 @@ class TestCheckSingleTactic:
     @pytest.mark.asyncio
     async def test_wrong_tactic(self, workspace, lifespan_state):
         """Run an invalid tactic, verify error response."""
-        from rocq_mcp.interactive import run_start, run_check
+        from rocq_mcp.interactive import run_check, run_start
 
         vfile = workspace / "check_wrong.v"
         vfile.write_text(
@@ -154,7 +154,7 @@ class TestCheckBatch:
     @pytest.mark.asyncio
     async def test_batch_execution(self, workspace, lifespan_state):
         """Run multiple tactics as one body, verify commands_run and proof_finished."""
-        from rocq_mcp.interactive import run_start, run_check
+        from rocq_mcp.interactive import run_check, run_start
 
         vfile = workspace / "check_batch.v"
         vfile.write_text(
@@ -208,7 +208,7 @@ class TestCheckBatch:
         all hit the same code path and must produce identical envelope
         shape (reason="tactic_failed", failed_command, command_index,
         last_valid_state_id, recent_errors round-trip)."""
-        from rocq_mcp.interactive import run_start, run_check
+        from rocq_mcp.interactive import run_check, run_start
 
         vfile = workspace / "check_batch_err.v"
         vfile.write_text(
@@ -262,7 +262,7 @@ class TestCheckFromState:
     @pytest.mark.asyncio
     async def test_from_state_branching(self, workspace, lifespan_state):
         """Start a theorem, run tactic A, then run tactic B from the same start state."""
-        from rocq_mcp.interactive import run_start, run_check
+        from rocq_mcp.interactive import run_check, run_start
 
         vfile = workspace / "check_branch.v"
         vfile.write_text(
@@ -334,7 +334,7 @@ class TestCheckEdgeCases:
     @pytest.mark.asyncio
     async def test_empty_body(self, workspace, lifespan_state):
         """Call run_check with empty body, verify success with commands_run=0."""
-        from rocq_mcp.interactive import run_start, run_check
+        from rocq_mcp.interactive import run_check, run_start
 
         vfile = workspace / "check_empty.v"
         vfile.write_text("Theorem t : True.\nProof. exact I. Qed.\n")
@@ -359,7 +359,7 @@ class TestCheckEdgeCases:
     @pytest.mark.asyncio
     async def test_auto_dot_append(self, workspace, lifespan_state):
         """Run a tactic without trailing dot, verify it still works."""
-        from rocq_mcp.interactive import run_start, run_check
+        from rocq_mcp.interactive import run_check, run_start
 
         vfile = workspace / "check_autodot.v"
         vfile.write_text(
@@ -386,7 +386,7 @@ class TestCheckEdgeCases:
     @pytest.mark.asyncio
     async def test_check_time_ms(self, workspace, lifespan_state):
         """Verify check_time_ms is present and is a non-negative int on success."""
-        from rocq_mcp.interactive import run_start, run_check
+        from rocq_mcp.interactive import run_check, run_start
 
         vfile = workspace / "check_timing.v"
         vfile.write_text("Theorem t : True.\nProof. exact I. Qed.\n")
@@ -422,7 +422,7 @@ class TestCheckTimeout:
     @pytest.mark.asyncio
     async def test_timeout_single_tactic(self, workspace):
         """Use a looping tactic with a short timeout, verify timeout error."""
-        from rocq_mcp.interactive import run_start, run_check
+        from rocq_mcp.interactive import run_check, run_start
         from rocq_mcp.server import _invalidate_pet
 
         vfile = workspace / "check_timeout.v"
@@ -466,7 +466,7 @@ class TestCheckProofTactics:
     @pytest.mark.asyncio
     async def test_single_tactic_proof(self, workspace, lifespan_state):
         """A one-tactic proof returns proof_tactics with that tactic."""
-        from rocq_mcp.interactive import run_start, run_check
+        from rocq_mcp.interactive import run_check, run_start
 
         vfile = workspace / "check_pt_single.v"
         vfile.write_text("Theorem t : True.\nProof. exact I. Qed.\n")
@@ -495,7 +495,7 @@ class TestCheckProofTactics:
     @pytest.mark.asyncio
     async def test_multi_step_proof(self, workspace, lifespan_state):
         """A multi-step proof returns all tactics in order."""
-        from rocq_mcp.interactive import run_start, run_check
+        from rocq_mcp.interactive import run_check, run_start
 
         vfile = workspace / "check_pt_multi.v"
         vfile.write_text(
@@ -535,7 +535,7 @@ class TestCheckProofTactics:
     @pytest.mark.asyncio
     async def test_batch_proof(self, workspace, lifespan_state):
         """A batch body that finishes the proof returns all tactics."""
-        from rocq_mcp.interactive import run_start, run_check
+        from rocq_mcp.interactive import run_check, run_start
 
         vfile = workspace / "check_pt_batch.v"
         vfile.write_text(
@@ -563,7 +563,7 @@ class TestCheckProofTactics:
     @pytest.mark.asyncio
     async def test_no_proof_tactics_when_not_finished(self, workspace, lifespan_state):
         """proof_tactics and proof_hint are absent when proof is not finished."""
-        from rocq_mcp.interactive import run_start, run_check
+        from rocq_mcp.interactive import run_check, run_start
 
         vfile = workspace / "check_pt_notfinished.v"
         vfile.write_text(
@@ -592,7 +592,7 @@ class TestCheckProofTactics:
     @pytest.mark.asyncio
     async def test_branching_returns_committed_path(self, workspace, lifespan_state):
         """After branching, proof_tactics reflects only the committed path."""
-        from rocq_mcp.interactive import run_start, run_check
+        from rocq_mcp.interactive import run_check, run_start
 
         vfile = workspace / "check_pt_branch.v"
         vfile.write_text(
@@ -656,7 +656,7 @@ class TestCheckProofTactics:
         broken-walk paths; the happy path carries only proof_tactics and
         proof_hint, with no status field at all.
         """
-        from rocq_mcp.interactive import run_start, run_check
+        from rocq_mcp.interactive import run_check, run_start
 
         vfile = workspace / "check_pt_complete_flag.v"
         vfile.write_text("Theorem t : True.\nProof. exact I. Qed.\n")
@@ -694,7 +694,7 @@ class TestCheckProofTactics:
         the result drops proof_tactics and reports ancestor_evicted at the
         first missing id.
         """
-        from rocq_mcp.interactive import run_start, run_check, _state_remove
+        from rocq_mcp.interactive import _state_remove, run_check, run_start
 
         vfile = workspace / "check_pt_evicted.v"
         vfile.write_text(
@@ -752,7 +752,7 @@ class TestCheckFocusDepth:
         self, workspace, lifespan_state
     ):
         """Entering `{` deepens focus; `}` returns to the prior depth."""
-        from rocq_mcp.interactive import run_start, run_check
+        from rocq_mcp.interactive import run_check, run_start
 
         vfile = workspace / "focus_depth.v"
         vfile.write_text(
@@ -856,8 +856,8 @@ class TestCheckMultiCommandTimeout:
         from types import SimpleNamespace
         from unittest.mock import MagicMock, patch
 
-        import rocq_mcp.server
         import rocq_mcp.interactive as _interactive
+        import rocq_mcp.server
 
         # Set up state
         _interactive._state_table.clear()
@@ -924,9 +924,9 @@ class TestCheckClamp:
     @pytest.mark.asyncio
     async def test_rocq_check_clamps_timeout(self, monkeypatch):
         """Wrapper clamps an over-cap timeout and echoes ``clamped_timeout``."""
+        import rocq_mcp.server as _server
         from rocq_mcp.server import rocq_check
         from tests.conftest import _MockContext
-        import rocq_mcp.server as _server
 
         captured: dict = {}
 

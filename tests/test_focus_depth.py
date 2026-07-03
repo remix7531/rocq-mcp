@@ -77,8 +77,8 @@ class TestFocusDepthCheck(_MockPetBase):
 
     @pytest.mark.asyncio
     async def test_check_reports_focus_depth(self):
-        import rocq_mcp.server as srv
         import rocq_mcp.interactive as _interactive
+        import rocq_mcp.server as srv
 
         new_state = SimpleNamespace(st=43, proof_finished=False, feedback=[])
 
@@ -104,8 +104,8 @@ class TestFocusDepthStepMulti(_MockPetBase):
 
     @pytest.mark.asyncio
     async def test_step_multi_reports_focus_depth_per_entry(self):
-        import rocq_mcp.server as srv
         import rocq_mcp.interactive as _interactive
+        import rocq_mcp.server as srv
 
         new_state = SimpleNamespace(st=43, proof_finished=False, feedback=[])
 

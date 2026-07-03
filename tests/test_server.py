@@ -20,7 +20,6 @@ TestFormatGoalsDefField: _format_goals hypothesis def_ field rendering
 
 from __future__ import annotations
 
-import asyncio
 import os
 import threading
 import time
@@ -29,6 +28,13 @@ from unittest import mock
 
 import pytest
 
+from rocq_mcp.compile import (
+    _MAX_ERROR_LENGTH,
+    _MAX_FORMAT_WARNINGS,
+    _format_error,
+    _parse_coqc_error_positions,
+)
+from rocq_mcp.interactive import _format_goals
 from rocq_mcp.server import (
     _find_project_root_from_file,
     _force_release_pet_lock,
@@ -40,13 +46,6 @@ from rocq_mcp.server import (
     _run_with_pet,
     _validate_workspace,
 )
-from rocq_mcp.compile import (
-    _format_error,
-    _parse_coqc_error_positions,
-    _MAX_ERROR_LENGTH,
-    _MAX_FORMAT_WARNINGS,
-)
-from rocq_mcp.interactive import _format_goals
 from tests.conftest import add_mock_state, make_lifespan_state
 
 # =========================================================================
@@ -1337,11 +1336,11 @@ class TestWorkspaceWarning:
         is quiet — that's the legitimate scratch / one-off workflow,
         not a config bug.
         """
-        from rocq_mcp import server as _server
-
         # ROCQ_WORKSPACE is whatever the test env has; force a markerless
         # tmpdir to be sure.
         import tempfile
+
+        from rocq_mcp import server as _server
 
         with tempfile.TemporaryDirectory() as td:
             monkeypatch.setattr(_server, "ROCQ_WORKSPACE", td)
@@ -1451,7 +1450,7 @@ class TestForceReleasePetLock:
         with pytest.raises(_PetLockTimeout):
             try:
                 raise _PetLockTimeout("test")
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 pytest.fail("_PetLockTimeout must not be caught as TimeoutError")
 
 
@@ -1724,7 +1723,7 @@ class TestFormatGoals:
 
     def test_truncates_many_goals(self):
         """More than _MAX_GOALS_SHOWN goals triggers the count truncation message."""
-        from rocq_mcp.interactive import _format_goals, _MAX_GOALS_SHOWN
+        from rocq_mcp.interactive import _MAX_GOALS_SHOWN, _format_goals
 
         goals = [
             self._make_goal(conclusion=f"goal_{i}") for i in range(_MAX_GOALS_SHOWN + 5)
@@ -1735,7 +1734,7 @@ class TestFormatGoals:
 
     def test_truncates_long_output(self):
         """Goals producing very long text (>_MAX_GOALS_LENGTH) are truncated."""
-        from rocq_mcp.interactive import _format_goals, _MAX_GOALS_LENGTH
+        from rocq_mcp.interactive import _MAX_GOALS_LENGTH, _format_goals
 
         # Create a single goal with a very long conclusion
         long_conclusion = "x" * (_MAX_GOALS_LENGTH + 500)
@@ -1974,7 +1973,7 @@ class TestPetInvalidationHooks:
 
     @pytest.fixture(autouse=True)
     def _clean(self):
-        from rocq_mcp.interactive import _state_invalidate_all, _invalidate_import_cache
+        from rocq_mcp.interactive import _invalidate_import_cache, _state_invalidate_all
 
         _state_invalidate_all()
         _invalidate_import_cache()
@@ -1984,8 +1983,9 @@ class TestPetInvalidationHooks:
 
     def test_hooks_clear_state_table(self):
         """Invalidation hooks clear the state table."""
-        from rocq_mcp.interactive import _state_add, _state_table, _state_invalidate_all
         from unittest.mock import MagicMock
+
+        from rocq_mcp.interactive import _state_add, _state_invalidate_all, _state_table
 
         state = MagicMock()
         state.proof_finished = False
@@ -2016,7 +2016,7 @@ class TestPetInvalidationHooks:
     def test_hooks_registered_in_server(self):
         """Both hooks are registered in _pet_invalidation_hooks."""
         import rocq_mcp.server as srv
-        from rocq_mcp.interactive import _state_invalidate_all, _invalidate_import_cache
+        from rocq_mcp.interactive import _invalidate_import_cache, _state_invalidate_all
 
         hook_funcs = srv._pet_invalidation_hooks
         assert _state_invalidate_all in hook_funcs
@@ -2024,13 +2024,14 @@ class TestPetInvalidationHooks:
 
     def test_invalidate_pet_calls_hooks(self):
         """_invalidate_pet triggers hooks that clear state table and import cache."""
+        from unittest.mock import MagicMock
+
         import rocq_mcp.server as srv
         from rocq_mcp.interactive import (
+            _import_cache,
             _state_add,
             _state_table,
-            _import_cache,
         )
-        from unittest.mock import MagicMock
 
         # Populate state table
         state = MagicMock()
@@ -2061,11 +2062,10 @@ class TestPetInvalidationHooks:
 
     def test_import_cache_generation_incremented(self):
         """_invalidate_import_cache increments the generation counter."""
+        import rocq_mcp.interactive as intermod
         from rocq_mcp.interactive import (
-            _import_cache_generation,
             _invalidate_import_cache,
         )
-        import rocq_mcp.interactive as intermod
 
         gen_before = intermod._import_cache_generation
         _invalidate_import_cache()
@@ -2175,8 +2175,9 @@ class TestKillPet:
 
     def test_kill_pet_already_dead_skips_signals(self):
         """_kill_pet skips signals if process already exited (PID reuse guard)."""
-        from rocq_mcp.server import _kill_pet
         from unittest.mock import MagicMock, patch
+
+        from rocq_mcp.server import _kill_pet
 
         pet = MagicMock()
         pet.process.poll.return_value = 0  # Already exited
@@ -2196,9 +2197,10 @@ class TestKillPet:
 
     def test_kill_pet_with_own_pgrp_sends_sigterm(self):
         """_kill_pet with _own_pgrp=True uses os.killpg(SIGTERM)."""
-        from rocq_mcp.server import _kill_pet
-        from unittest.mock import MagicMock, patch
         import signal
+        from unittest.mock import MagicMock, patch
+
+        from rocq_mcp.server import _kill_pet
 
         pet = MagicMock()
         pet.process.poll.return_value = None  # Still running
@@ -2210,7 +2212,7 @@ class TestKillPet:
         pet._own_pgrp = True
 
         with (
-            patch("rocq_mcp.server.os.getpgid", return_value=12345) as mock_getpgid,
+            patch("rocq_mcp.server.os.getpgid", return_value=12345),
             patch("rocq_mcp.server.os.killpg") as mock_killpg,
         ):
             _kill_pet(pet)
@@ -2218,8 +2220,9 @@ class TestKillPet:
 
     def test_kill_pet_without_own_pgrp_uses_terminate(self):
         """_kill_pet with _own_pgrp=False uses process.terminate()."""
-        from rocq_mcp.server import _kill_pet
         from unittest.mock import MagicMock
+
+        from rocq_mcp.server import _kill_pet
 
         pet = MagicMock()
         pet.process.poll.return_value = None  # Still running
@@ -2234,10 +2237,11 @@ class TestKillPet:
 
     def test_kill_pet_escalates_to_sigkill(self):
         """_kill_pet escalates to SIGKILL if SIGTERM doesn't work."""
-        from rocq_mcp.server import _kill_pet
-        from unittest.mock import MagicMock, patch
         import signal
         import subprocess
+        from unittest.mock import MagicMock, patch
+
+        from rocq_mcp.server import _kill_pet
 
         pet = MagicMock()
         pet.process.poll.return_value = None  # Still running
@@ -2272,8 +2276,9 @@ class TestEnsurePetHooks:
 
     def test_hooks_called_on_dead_pet_detection(self):
         """When _ensure_pet finds a dead pet, it calls _kill_pet and hooks."""
-        import rocq_mcp.server as server
         from unittest.mock import MagicMock, patch
+
+        import rocq_mcp.server as server
 
         hook_calls = []
         original_hooks = list(server._pet_invalidation_hooks)
@@ -2853,6 +2858,7 @@ class TestCheckPetAvailability:
     def test_both_present_returns_none(self, monkeypatch):
         import sys
         import types
+
         import rocq_mcp.server as _server
 
         # Pretend pytanque imports cleanly.
@@ -2863,6 +2869,7 @@ class TestCheckPetAvailability:
 
     def test_pytanque_missing_warns(self, monkeypatch):
         import sys
+
         import rocq_mcp.server as _server
 
         # Block pytanque from importing.
@@ -2878,6 +2885,7 @@ class TestCheckPetAvailability:
     def test_binary_missing_warns(self, monkeypatch):
         import sys
         import types
+
         import rocq_mcp.server as _server
 
         if "pytanque" not in sys.modules:
@@ -2894,6 +2902,7 @@ class TestCheckPetAvailability:
 
     def test_both_missing_combined(self, monkeypatch):
         import sys
+
         import rocq_mcp.server as _server
 
         monkeypatch.setitem(sys.modules, "pytanque", None)
@@ -2908,6 +2917,7 @@ class TestCheckPetAvailability:
 
     def test_message_names_install_command(self, monkeypatch):
         import sys
+
         import rocq_mcp.server as _server
 
         monkeypatch.setitem(sys.modules, "pytanque", None)
@@ -2927,6 +2937,7 @@ class TestCheckPetAvailability:
 
     def test_message_names_affected_tools(self, monkeypatch):
         import sys
+
         import rocq_mcp.server as _server
 
         monkeypatch.setitem(sys.modules, "pytanque", None)

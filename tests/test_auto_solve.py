@@ -14,13 +14,13 @@ from __future__ import annotations
 
 import pytest
 
-from tests.conftest import PET_AVAILABLE
 from rocq_mcp.compile import (
     _find_sentence_end,
     _is_focus_token,
     _leading_focus_token,
     _split_rocq_sentences,
 )
+from tests.conftest import PET_AVAILABLE
 
 # Standard automation tactics for step_multi
 AUTO_TACTICS = [
@@ -240,7 +240,7 @@ async def _auto_solve(workspace, source, theorem, preamble_tactics=None, state=N
     Returns dict with 'solved', 'tactic' (on success), 'error' (on failure),
     and 'results' (full step_multi results).
     """
-    from rocq_mcp.interactive import run_start, run_check, run_step_multi
+    from rocq_mcp.interactive import run_check, run_start, run_step_multi
 
     if state is None:
         state = _make_state()

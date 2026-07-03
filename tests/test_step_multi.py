@@ -245,8 +245,7 @@ class TestStepMultiReal:
 
     def test_valid_tactics_with_from_state(self):
         """run_step_multi with from_state uses the specified state."""
-        from rocq_mcp.interactive import run_step_multi
-        from rocq_mcp.interactive import _state_add
+        from rocq_mcp.interactive import _state_add, run_step_multi
 
         # Inject two states into the state table
         state_a = _make_mock_state(proof_finished=False)
@@ -317,8 +316,7 @@ class TestStepMultiReal:
 
     def test_broken_pipe_returns_pet_restarted(self):
         """run_step_multi returns pet_restarted=True on BrokenPipeError."""
-        from rocq_mcp.interactive import run_step_multi
-        from rocq_mcp.interactive import _state_add
+        from rocq_mcp.interactive import _state_add, run_step_multi
 
         # Inject a mock state into the state table
         parent_state = _make_mock_state(proof_finished=False)
@@ -354,8 +352,7 @@ class TestStepMultiReal:
 
     def test_connection_error_returns_pet_restarted(self):
         """run_step_multi returns pet_restarted=True on ConnectionError."""
-        from rocq_mcp.interactive import run_step_multi
-        from rocq_mcp.interactive import _state_add
+        from rocq_mcp.interactive import _state_add, run_step_multi
 
         # Inject a mock state into the state table
         parent_state = _make_mock_state(proof_finished=False)
@@ -397,8 +394,7 @@ class TestStepMultiReal:
         """
         from pytanque import PetanqueError
 
-        from rocq_mcp.interactive import run_step_multi
-        from rocq_mcp.interactive import _state_add
+        from rocq_mcp.interactive import _state_add, run_step_multi
 
         # Inject a mock state into the state table
         parent_state = _make_mock_state(proof_finished=False)
@@ -447,8 +443,7 @@ class TestStepMultiReal:
         """
         from pytanque import PetanqueError
 
-        from rocq_mcp.interactive import run_step_multi
-        from rocq_mcp.interactive import _state_add
+        from rocq_mcp.interactive import _state_add, run_step_multi
 
         # Inject a mock state into the state table
         parent_state = _make_mock_state(proof_finished=False)
@@ -495,7 +490,7 @@ class TestStepMultiReal:
         mid-batch failures — not just `{success: False, error}`."""
         from pytanque import PetanqueError
 
-        from rocq_mcp.interactive import run_step_multi, _state_add
+        from rocq_mcp.interactive import _state_add, run_step_multi
 
         parent_state = _make_mock_state(proof_finished=False)
         injected_id = _state_add(
@@ -664,8 +659,7 @@ class TestStepMultiTimeoutBudget:
 
     def test_per_tactic_timeout_is_divided(self):
         """Each tactic gets timeout/len(tactics) as its Rocq timeout."""
-        from rocq_mcp.interactive import run_step_multi
-        from rocq_mcp.interactive import _state_add
+        from rocq_mcp.interactive import _state_add, run_step_multi
 
         # Track what timeout was passed to pet.run
         recorded_timeouts = []
@@ -727,8 +721,7 @@ class TestStepMultiTimeoutBudget:
 
     def test_per_tactic_timeout_minimum_is_one(self):
         """Per-tactic budget is at least 1 even with many tactics."""
-        from rocq_mcp.interactive import run_step_multi
-        from rocq_mcp.interactive import _state_add
+        from rocq_mcp.interactive import _state_add, run_step_multi
 
         recorded_timeouts = []
 
@@ -780,8 +773,7 @@ class TestStepMultiTimeoutBudget:
 
     def test_non_eligible_tactics_get_none_timeout(self):
         """Tactics that are not timeout-eligible (e.g., bullets) get timeout=None."""
-        from rocq_mcp.interactive import run_step_multi
-        from rocq_mcp.interactive import _state_add
+        from rocq_mcp.interactive import _state_add, run_step_multi
 
         recorded_calls = []
 
@@ -872,8 +864,7 @@ class TestStepMultiDeadPetDetection:
         """
         from pytanque import PetanqueError
 
-        from rocq_mcp.interactive import run_step_multi
-        from rocq_mcp.interactive import _state_add
+        from rocq_mcp.interactive import _state_add, run_step_multi
 
         # Inject a mock state into the state table
         parent_state = _make_mock_state(proof_finished=False)

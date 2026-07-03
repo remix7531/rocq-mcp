@@ -191,8 +191,8 @@ class TestStalenessInRunCheck:
     @pytest.mark.asyncio
     async def test_stale_warning_in_success_response(self):
         """run_check success result should include stale_warning."""
-        import rocq_mcp.server as _srv
         import rocq_mcp.interactive as _int
+        import rocq_mcp.server as _srv
 
         new_state = SimpleNamespace(st=2, proof_finished=True, feedback=[])
         mock_pet = MagicMock()
@@ -221,9 +221,10 @@ class TestStalenessInRunCheck:
     @pytest.mark.asyncio
     async def test_stale_warning_in_error_response(self):
         """run_check error result should also include stale_warning."""
-        import rocq_mcp.server as _srv
-        import rocq_mcp.interactive as _int
         from pytanque import PetanqueError
+
+        import rocq_mcp.interactive as _int
+        import rocq_mcp.server as _srv
 
         mock_pet = MagicMock()
         mock_pet.process = MagicMock()
@@ -257,8 +258,8 @@ class TestStalenessInRunCheck:
     @pytest.mark.asyncio
     async def test_no_stale_warning_for_fresh_state(self, tmp_path):
         """run_check should NOT include stale_warning when file is unchanged."""
-        import rocq_mcp.server as _srv
         import rocq_mcp.interactive as _int
+        import rocq_mcp.server as _srv
 
         # Create a fresh (non-stale) state
         f = tmp_path / "fresh.v"

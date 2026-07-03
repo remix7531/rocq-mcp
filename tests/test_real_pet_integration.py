@@ -23,7 +23,11 @@ import pytest
 
 from tests.conftest import PET_AVAILABLE, make_lifespan_state
 
-pytestmark = pytest.mark.skipif(not PET_AVAILABLE, reason="pet not available")
+pytestmark = [
+    pytest.mark.skipif(not PET_AVAILABLE, reason="pet not available"),
+    # Real pet + import loading: allow more than the global 120s ceiling.
+    pytest.mark.timeout(300),
+]
 
 
 # ---------------------------------------------------------------------------
@@ -83,7 +87,7 @@ class TestRocqDiagRealPet:
     async def test_diag_reports_live_pet_after_real_call(self, workspace):
         from rocq_mcp.diag import _build_diag_snapshot
         from rocq_mcp.interactive import run_query
-        from rocq_mcp.server import _invalidate_pet, ROCQ_MAX_PET_RSS_MB
+        from rocq_mcp.server import ROCQ_MAX_PET_RSS_MB, _invalidate_pet
 
         ls = make_lifespan_state(pet_timeout=30.0)
         ls["recent_errors"] = deque(maxlen=10)

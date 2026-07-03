@@ -6,13 +6,14 @@ below; they do not require an active rocq opam switch.
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from types import SimpleNamespace
-from typing import Any, Callable
+from typing import Any
 
 import pytest
 
-from rocq_mcp.proof_walk import ProofError, collect_file_errors
+from rocq_mcp.proof_walk import collect_file_errors
 
 # ---------------------------------------------------------------------------
 # Test helpers
@@ -196,7 +197,7 @@ class TestAttribution:
     def test_cascade_within_proof_dedup(self) -> None:
         """A proof with 5 sentences where 3 would fail still yields exactly
         one ``ProofError`` — pet.run raises on the first failing sentence."""
-        body_lines = ["Theorem t : True."] + ["Proof. bad1. bad2. bad3. Qed."]
+        body_lines = ["Theorem t : True.", "Proof. bad1. bad2. bad3. Qed."]
         # The 5-sentence count is conceptual; the cascade collapses because
         # pet.run on the whole chunk raises on the first error.
         source = "\n".join(body_lines) + "\n"
@@ -434,7 +435,7 @@ class TestDedup:
             _make_toc_element("real_t", "Theorem", 4),  # kept
         ]
         # Pad source so line 4 is reachable.
-        source = "\n".join(["line %d" % i for i in range(6)]) + "\n"
+        source = "\n".join([f"line {i}" for i in range(6)]) + "\n"
 
         seen_chunks: list[tuple[int, str]] = []
 

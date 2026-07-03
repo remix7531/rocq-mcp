@@ -19,11 +19,12 @@ import subprocess
 import threading
 import time
 import warnings
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 import psutil
-from fastmcp import FastMCP, Context
+from fastmcp import Context, FastMCP
 from fastmcp.server.lifespan import lifespan
 
 # ---------------------------------------------------------------------------
@@ -1571,7 +1572,7 @@ async def _run_with_pet(
                     auto_record=auto_record,
                 )
             raise
-        except asyncio.TimeoutError:
+        except TimeoutError:
             # If the wait_for timer and the watchdog raced, mem_event may
             # already be set; prefer the more specific memory_exhausted label.
             if mem_event.is_set():
@@ -1670,35 +1671,33 @@ async def _run_with_pet(
 # re-export is a test-monkeypatch trap waiting to happen.
 
 from rocq_mcp.compile import (  # noqa: E402
-    run_compile,
-    run_compile_file,
     run_verify,
-)
-from rocq_mcp.interactive import (  # noqa: E402
-    run_assumptions,
-    run_query,
-    run_start,
-    run_check,
-    run_step_multi,
-    run_toc,
-    run_notations,
-)
-from rocq_mcp.diag import (  # noqa: E402
-    _DIAG_LIVE_STATES_CAP,
-    _build_diag_snapshot,
-    _sample_pet_rss_mb,
-)
-from rocq_mcp.health import (  # noqa: E402
-    build_health_snapshot,
-    compute_switch_env,
-    list_switches,
-    _detect_switch,
-    _resolve_binary,
-    _SWITCH_ENV_KEYS,
 )
 from rocq_mcp.compile_enrichment import (  # noqa: E402
     run_compile_file_with_state,
     run_compile_with_state,
+)
+from rocq_mcp.diag import (  # noqa: E402
+    _DIAG_LIVE_STATES_CAP,  # noqa: F401  (accessed as _server._DIAG_LIVE_STATES_CAP in tests)
+    _build_diag_snapshot,
+    _sample_pet_rss_mb,  # noqa: F401  (accessed as _server._sample_pet_rss_mb in tests)
+)
+from rocq_mcp.health import (  # noqa: E402
+    _SWITCH_ENV_KEYS,
+    _detect_switch,
+    _resolve_binary,
+    build_health_snapshot,
+    compute_switch_env,
+    list_switches,
+)
+from rocq_mcp.interactive import (  # noqa: E402
+    run_assumptions,
+    run_check,
+    run_notations,
+    run_query,
+    run_start,
+    run_step_multi,
+    run_toc,
 )
 
 # ---------------------------------------------------------------------------
