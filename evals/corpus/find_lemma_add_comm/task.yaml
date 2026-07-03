@@ -17,3 +17,10 @@ check:
     expect:
       success: true
       output_contains: "add_comm"
+  - tool: rocq_search
+    args:
+      preamble: "From Coq Require Import Arith."
+      pattern: "(_ + _ = _ + _)"
+    expect:
+      success: true
+      hits_contains: "add_comm"

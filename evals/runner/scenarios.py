@@ -128,6 +128,16 @@ async def find_lemma_add_comm(client: Any, ws: Path) -> None:
     assert q["success"] is True, q
     assert "add_comm" in str(q.get("output", "")), q
 
+    s = await _call(
+        client,
+        "rocq_search",
+        preamble="From Coq Require Import Arith.",
+        pattern="(_ + _ = _ + _)",
+    )
+    assert s["success"] is True, s
+    names = [h.get("name", "") for h in s["hits"]]
+    assert any("add_comm" in n for n in names), s
+
 
 async def prove_with_step_multi(client: Any, ws: Path) -> None:
     file = str(ws / "AddComm.v")

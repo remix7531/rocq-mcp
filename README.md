@@ -6,7 +6,7 @@
 
 An [MCP](https://modelcontextprotocol.io/) server for [Rocq](https://rocq-prover.org/) (formerly Coq) proof development. It exposes compilation, verification, querying, and interactive tactic stepping as MCP tools, so that LLM agents can write and check Rocq proofs.
 
-- **Thirteen MCP tools** backed by [pet](https://github.com/ejgallego/coq-lsp) (Rocq's coq-lsp interactive backend).
+- **Fifteen MCP tools** backed by [pet](https://github.com/ejgallego/coq-lsp) (Rocq's coq-lsp interactive backend).
 - **Interactive session** that keeps imports warm across calls — inspect goals, search the environment, step through tactics without re-paying coqc's import cost.
 - **Staged verification.** Sandboxed audit of admits, axioms, and statement mismatches.
 - **Agent-first surface.** Server instructions, tool annotations, on-demand documentation resources, and workflow prompts.
@@ -19,7 +19,7 @@ An [MCP](https://modelcontextprotocol.io/) server for [Rocq](https://rocq-prover
 | **`rocq_compile`** | Compile Rocq source from a string buffer via coqc. |
 | **`rocq_compile_file`** | Compile a .v file on disk via coqc — whole-file check and final verification. |
 | **`rocq_verify`** | Verify a proof proves the original statement — sandboxed admit/axiom/statement check. |
-| **`rocq_query`** | Run a Rocq query (Search / Check / Print / About / Locate) and return its output. |
+| **`rocq_query`** | Run a raw Rocq query (Check / Print / About / Locate / Search) and return its output. |
 | **`rocq_assumptions`** | List the axioms a theorem depends on (Print Assumptions), parsed. |
 | **`rocq_toc`** | Outline a .v file: definitions, lemmas, theorems, and sections as a hierarchy. |
 | **`rocq_notations`** | Resolve every notation in a statement: which notation, scope, and module. |
@@ -29,6 +29,8 @@ An [MCP](https://modelcontextprotocol.io/) server for [Rocq](https://rocq-prover
 | **`rocq_diag`** | Server runtime diagnostics: pet health, memory, lock contention, recent errors. |
 | **`rocq_health`** | Toolchain health: is coqc resolvable, and which opam switch is this server on? |
 | **`rocq_switch`** | Switch the running server to another opam switch — process-global and destructive. |
+| **`rocq_search`** | Search the environment for lemmas/definitions matching a pattern — structured hits. |
+| **`rocq_goal`** | Show proof goals at a live state_id or a file position — registers no state. |
 <!-- END GENERATED: tools -->
 
 ## Agent documentation
@@ -60,7 +62,7 @@ Every failure response carries `{success: false, error, reason}` with a
 fixed 11-value `reason` taxonomy — agents dispatch on `reason`, never on
 message text: `validation`, `not_found`, `timeout`, `crashed`,
 `memory_exhausted`, `lock_contended`, `unavailable`, `tactic_failed`,
-`compile_error`, `axiom_dependency`, `type_mismatch`.
+`query_rejected`, `compile_error`, `axiom_dependency`, `type_mismatch`.
 
 ## Prerequisites
 

@@ -19,6 +19,26 @@
 
 ### Added
 
+- **Two new tools** (15 total): `rocq_search` — structured lemma search
+  (parsed `hits: [{name, type}]`, `is:`/`inside`/`outside` filters,
+  multi-pattern fan-out with `matched_patterns`, pagination; a rejected
+  pattern fails with the new `query_rejected` reason) and `rocq_goal` —
+  stateless goal inspection at a live state or file position
+  (`goals_format`, `diff_from` for comparing two exploration branches;
+  registers nothing in the state table).
+- **Finished proofs return `proof_script`** — a ready-to-paste
+  declaration + `Proof.` + tactics + `Qed.` (plus `statement`,
+  `statement_source`), assembled server-side. The tactic chain is now
+  materialized per state (`tactic_path`), so LRU eviction of ancestors
+  can no longer break `proof_tactics` — the `ancestor_evicted`/`cycle`
+  failure modes are structurally gone (only leaf eviction remains).
+- **`rocq_step_multi` upgrades**: per-tactic `timeouts=[...]` budgets,
+  `time_ms` on every entry, `preset="auto"` (appends the automation
+  battery, deduped, capped at 20), and a `summary`
+  (tried/succeeded/finished/distinct_outcomes/best).
+- Multi-error `errors[]` entries now carry `start_args`
+  ({file, line, character}) — copy-paste recovery for errors 2..N.
+
 - `goals_format` on `rocq_check` (`pretty` | `structured` |
   `names_only` | `diff` | `none`) and on `rocq_start` /
   `rocq_step_multi` (`pretty` | `structured` | `names_only`).
