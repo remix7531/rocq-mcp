@@ -73,6 +73,39 @@ class TestToolInventory:
         assert set(tools) == EXPECTED_TOOLS
 
 
+class TestResourcesAndPrompts:
+    async def test_guides_are_served(self):
+        from fastmcp import Client
+
+        from rocq_mcp.server import mcp
+
+        async with Client(mcp) as client:
+            uris = {str(r.uri) for r in await client.list_resources()}
+            assert uris == {
+                "rocq://guide/workflows",
+                "rocq://guide/failures",
+                "rocq://guide/concurrency",
+                "rocq://guide/responses",
+            }
+            content = await client.read_resource("rocq://guide/workflows")
+            assert "rocq_step_multi" in content[0].text
+            assert content[0].mimeType == "text/markdown"
+
+    async def test_prompts_render(self):
+        from fastmcp import Client
+
+        from rocq_mcp.server import mcp
+
+        async with Client(mcp) as client:
+            names = {p.name for p in await client.list_prompts()}
+            assert names == {"prove_theorem", "debug_compile_error"}
+            got = await client.get_prompt(
+                "prove_theorem", {"file": "A.v", "theorem": "t_ok"}
+            )
+            text = got.messages[0].content.text
+            assert "t_ok" in text and "rocq_start" in text and "rocq_verify" in text
+
+
 class TestAnnotations:
     async def test_hints_match_the_table(self, surface):
         _, _, tools = surface

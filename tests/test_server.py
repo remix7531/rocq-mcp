@@ -2795,40 +2795,6 @@ class TestVoRebuildWarning:
         assert "vo_rebuild_warning" not in result
 
 
-# =========================================================================
-# README documentation patterns smoke test
-# =========================================================================
-
-
-class TestReadmeUsagePatterns:
-    """Catch accidental deletion of the §1.8 'Recommended usage patterns' sections.
-
-    Pure docs assertion — no Rocq invocation.  If these sections are
-    renamed deliberately, update this test.
-    """
-
-    def _readme_text(self) -> str:
-        readme = Path(__file__).resolve().parent.parent / "README.md"
-        return readme.read_text(encoding="utf-8")
-
-    def test_recommended_patterns_section_present(self):
-        readme = self._readme_text()
-        assert "## Recommended usage patterns" in readme
-
-    def test_multi_tactic_exploration_subsection_present(self):
-        readme = self._readme_text()
-        assert "Multi-tactic exploration" in readme
-        # Canonical example references both tools.
-        assert "rocq_check" in readme
-        assert "rocq_step_multi" in readme
-
-    def test_imports_and_scopes_subsection_present(self):
-        readme = self._readme_text()
-        assert "Imports and scopes in `rocq_query`" in readme
-        # Names the parameter agents should reach for.
-        assert "preamble=" in readme
-
-
 # ---------------------------------------------------------------------------
 # Pet-availability startup check (_check_pet_availability)
 # ---------------------------------------------------------------------------
