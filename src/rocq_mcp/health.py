@@ -221,8 +221,9 @@ def build_health_snapshot(lifespan_state: dict[str, Any]) -> dict[str, Any]:
         pytanque_importable = False
 
     client = lifespan_state.get("pet_client")
-    pet_running = client is not None and getattr(client, "process", None) is not None
-    pet_pid = client.process.pid if pet_running else None
+    process = getattr(client, "process", None) if client is not None else None
+    pet_running = process is not None
+    pet_pid = process.pid if process is not None else None
 
     switch = _detect_switch(coqc_path)
 
