@@ -15,6 +15,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+import rocq_mcp.pet_runtime as _pet_runtime
 from rocq_mcp.interactive import _check_staleness, _StateEntry
 from tests.conftest import make_lifespan_state
 
@@ -138,11 +139,10 @@ class TestStalenessInRunCheck:
     def _setup_mock_state(self, tmp_path):
         """Set up a state entry with a stale file, mock pet."""
         import rocq_mcp.interactive as _int
-        import rocq_mcp.server as _srv
 
         # Reset state table
         _int._state_invalidate_all()
-        _srv._pet_semaphore = None
+        _pet_runtime._pet_semaphore = None
 
         # Create a file and record its mtime
         f = tmp_path / "test.v"
@@ -170,7 +170,7 @@ class TestStalenessInRunCheck:
 
         yield
         _int._state_invalidate_all()
-        _srv._pet_semaphore = None
+        _pet_runtime._pet_semaphore = None
 
     @pytest.fixture(autouse=True)
     def _mock_pytanque(self):
@@ -191,8 +191,8 @@ class TestStalenessInRunCheck:
     @pytest.mark.asyncio
     async def test_stale_warning_in_success_response(self):
         """run_check success result should include stale_warning."""
-        import rocq_mcp.server as _srv
         import rocq_mcp.interactive as _int
+        import rocq_mcp.server as _srv
 
         new_state = SimpleNamespace(st=2, proof_finished=True, feedback=[])
         mock_pet = MagicMock()
@@ -221,9 +221,10 @@ class TestStalenessInRunCheck:
     @pytest.mark.asyncio
     async def test_stale_warning_in_error_response(self):
         """run_check error result should also include stale_warning."""
-        import rocq_mcp.server as _srv
-        import rocq_mcp.interactive as _int
         from pytanque import PetanqueError
+
+        import rocq_mcp.interactive as _int
+        import rocq_mcp.server as _srv
 
         mock_pet = MagicMock()
         mock_pet.process = MagicMock()
@@ -257,8 +258,8 @@ class TestStalenessInRunCheck:
     @pytest.mark.asyncio
     async def test_no_stale_warning_for_fresh_state(self, tmp_path):
         """run_check should NOT include stale_warning when file is unchanged."""
-        import rocq_mcp.server as _srv
         import rocq_mcp.interactive as _int
+        import rocq_mcp.server as _srv
 
         # Create a fresh (non-stale) state
         f = tmp_path / "fresh.v"

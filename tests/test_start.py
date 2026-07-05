@@ -11,10 +11,10 @@ the position-based tests from test_step_at_pos.py.
 
 from __future__ import annotations
 
-from pathlib import Path
-
 import pytest
 
+import rocq_mcp.config as _config
+import rocq_mcp.pet_runtime as _pet_runtime
 import rocq_mcp.workspace as _workspace
 from tests.conftest import PET_AVAILABLE, _MockPetBase
 
@@ -402,8 +402,8 @@ class TestStartProofFinished(_MockPetBase):
         from types import SimpleNamespace
         from unittest.mock import MagicMock, patch
 
-        import rocq_mcp.server
         import rocq_mcp.interactive as _interactive
+        import rocq_mcp.server
 
         mock_state = SimpleNamespace(st=42, proof_finished=False, feedback=[])
         mock_pet = MagicMock()
@@ -442,8 +442,8 @@ class TestStartProofFinished(_MockPetBase):
         from types import SimpleNamespace
         from unittest.mock import MagicMock, patch
 
-        import rocq_mcp.server
         import rocq_mcp.interactive as _interactive
+        import rocq_mcp.server
 
         mock_state = SimpleNamespace(st=42, proof_finished=True, feedback=[])
         mock_pet = MagicMock()
@@ -482,8 +482,8 @@ class TestStartProofFinished(_MockPetBase):
         from types import SimpleNamespace
         from unittest.mock import MagicMock, patch
 
-        import rocq_mcp.server
         import rocq_mcp.interactive as _interactive
+        import rocq_mcp.server
 
         mock_state = SimpleNamespace(st=42, proof_finished=False, feedback=[])
         mock_pet = MagicMock()
@@ -524,8 +524,8 @@ class TestStartProofFinished(_MockPetBase):
         from types import SimpleNamespace
         from unittest.mock import MagicMock, patch
 
-        import rocq_mcp.server
         import rocq_mcp.interactive as _interactive
+        import rocq_mcp.server
 
         mock_state = SimpleNamespace(st=42, proof_finished=True, feedback=[])
         mock_pet = MagicMock()
@@ -565,8 +565,8 @@ class TestStartProofFinished(_MockPetBase):
         from types import SimpleNamespace
         from unittest.mock import MagicMock, patch
 
-        import rocq_mcp.server
         import rocq_mcp.interactive as _interactive
+        import rocq_mcp.server
 
         mock_state = SimpleNamespace(st=42, proof_finished=False, feedback=[])
         mock_pet = MagicMock()
@@ -612,8 +612,8 @@ class TestForceRestart(_MockPetBase):
         from types import SimpleNamespace
         from unittest.mock import MagicMock, patch
 
-        import rocq_mcp.server
         import rocq_mcp.interactive as _interactive
+        import rocq_mcp.server
 
         mock_state = SimpleNamespace(st=42, proof_finished=False, feedback=[])
         mock_pet = MagicMock()
@@ -656,8 +656,8 @@ class TestForceRestart(_MockPetBase):
         from types import SimpleNamespace
         from unittest.mock import MagicMock, patch
 
-        import rocq_mcp.server
         import rocq_mcp.interactive as _interactive
+        import rocq_mcp.server
 
         mock_state = SimpleNamespace(st=42, proof_finished=False, feedback=[])
         mock_pet = MagicMock()
@@ -700,8 +700,8 @@ class TestForceRestart(_MockPetBase):
         from types import SimpleNamespace
         from unittest.mock import MagicMock, patch
 
-        import rocq_mcp.server
         import rocq_mcp.interactive as _interactive
+        import rocq_mcp.server
         from rocq_mcp.interactive import _state_table
 
         mock_state = SimpleNamespace(st=42, proof_finished=False, feedback=[])
@@ -773,6 +773,7 @@ def _make_failing_pet(toc_return):
     whose ``toc`` returns *toc_return*.
     """
     from unittest.mock import MagicMock
+
     from pytanque import PetanqueError
 
     mock_pet = MagicMock()
@@ -821,8 +822,8 @@ class TestStartNotFoundAvailableInFile(_MockPetBase):
     async def test_not_found_attaches_available_in_file(self, failing_pet_workspace):
         from unittest.mock import patch
 
-        import rocq_mcp.server
         import rocq_mcp.interactive as _interactive
+        import rocq_mcp.server
 
         ws, _ = failing_pet_workspace
         mock_pet = _make_failing_pet(
@@ -857,8 +858,8 @@ class TestStartNotFoundAvailableInFile(_MockPetBase):
         """The returned ``available_in_file`` list must be sorted."""
         from unittest.mock import patch
 
-        import rocq_mcp.server
         import rocq_mcp.interactive as _interactive
+        import rocq_mcp.server
 
         ws, _ = failing_pet_workspace
         # Insert names out-of-order so the only way the result is sorted
@@ -897,8 +898,8 @@ class TestStartNotFoundAvailableInFile(_MockPetBase):
         """
         from unittest.mock import patch
 
-        import rocq_mcp.server
         import rocq_mcp.interactive as _interactive
+        import rocq_mcp.server
 
         ws, _ = failing_pet_workspace
         names = [f"name_{i:04d}" for i in range(750)]
@@ -936,8 +937,8 @@ class TestStartNotFoundAvailableInFile(_MockPetBase):
         """
         from unittest.mock import patch
 
-        import rocq_mcp.server
         import rocq_mcp.interactive as _interactive
+        import rocq_mcp.server
 
         ws, _ = failing_pet_workspace
         names = [f"name_{i:03d}" for i in range(200)]
@@ -963,8 +964,8 @@ class TestStartNotFoundAvailableInFile(_MockPetBase):
         not ``"crashed"`` (which conflates pet death with name lookup)."""
         from unittest.mock import patch
 
-        import rocq_mcp.server
         import rocq_mcp.interactive as _interactive
+        import rocq_mcp.server
 
         ws, _ = failing_pet_workspace
         mock_pet = _make_failing_pet([("main", [_make_toc_elem("a")])])
@@ -985,8 +986,8 @@ class TestStartNotFoundAvailableInFile(_MockPetBase):
         """Two failures against the same file (same mtime) → pet.toc once."""
         from unittest.mock import patch
 
-        import rocq_mcp.server
         import rocq_mcp.interactive as _interactive
+        import rocq_mcp.server
 
         ws, _ = failing_pet_workspace
         mock_pet = _make_failing_pet(
@@ -1015,8 +1016,8 @@ class TestStartNotFoundAvailableInFile(_MockPetBase):
         import os
         from unittest.mock import patch
 
-        import rocq_mcp.server
         import rocq_mcp.interactive as _interactive
+        import rocq_mcp.server
 
         ws, test_file = failing_pet_workspace
         mock_pet = _make_failing_pet([("main", [_make_toc_elem("a")])])
@@ -1050,8 +1051,8 @@ class TestStartNotFoundAvailableInFile(_MockPetBase):
         """
         from unittest.mock import patch
 
-        import rocq_mcp.server
         import rocq_mcp.interactive as _interactive
+        import rocq_mcp.server
         from rocq_mcp.interactive import _TOC_CACHE
 
         ws, _ = failing_pet_workspace
@@ -1074,14 +1075,15 @@ class TestStartNotFoundAvailableInFile(_MockPetBase):
 
     def test_toc_cache_eviction_at_max(self):
         """Insert ``_TOC_CACHE_MAX + 1`` entries; oldest must be evicted."""
+        import os
+        import tempfile
+        from unittest.mock import MagicMock
+
         from rocq_mcp.interactive import (
             _TOC_CACHE,
             _TOC_CACHE_MAX,
             _toc_names_cached,
         )
-        import os
-        import tempfile
-        from unittest.mock import MagicMock
 
         _TOC_CACHE.clear()
         try:
@@ -1184,7 +1186,6 @@ class TestStartTimeoutForwarding:
     @pytest.mark.asyncio
     async def test_run_start_forwards_timeout(self, monkeypatch, tmp_path):
         """run_start(timeout=X) forwards X to _run_with_pet."""
-        import rocq_mcp.server as srv
         from rocq_mcp.interactive import run_start
 
         vfile = tmp_path / "t.v"
@@ -1196,7 +1197,7 @@ class TestStartTimeoutForwarding:
             captured["tool"] = tool
             return {"success": True, "state_id": 1}
 
-        monkeypatch.setattr(srv, "_run_with_pet", fake_run_with_pet)
+        monkeypatch.setattr(_pet_runtime, "_run_with_pet", fake_run_with_pet)
 
         lifespan_state = _make_lifespan_state()
         await run_start(
@@ -1212,7 +1213,6 @@ class TestStartTimeoutForwarding:
     @pytest.mark.asyncio
     async def test_run_start_default_timeout_is_none(self, monkeypatch, tmp_path):
         """Without explicit timeout, run_start forwards None (server default)."""
-        import rocq_mcp.server as srv
         from rocq_mcp.interactive import run_start
 
         vfile = tmp_path / "t.v"
@@ -1223,7 +1223,7 @@ class TestStartTimeoutForwarding:
             captured.update(kw)
             return {"success": True, "state_id": 1}
 
-        monkeypatch.setattr(srv, "_run_with_pet", fake_run_with_pet)
+        monkeypatch.setattr(_pet_runtime, "_run_with_pet", fake_run_with_pet)
 
         lifespan_state = _make_lifespan_state()
         await run_start(
@@ -1241,7 +1241,7 @@ class TestStartTimeoutForwarding:
 
         import rocq_mcp.server as srv
 
-        monkeypatch.setattr(srv, "ROCQ_QUERY_TIMEOUT_CAP", 60)
+        monkeypatch.setattr(_config, "ROCQ_QUERY_TIMEOUT_CAP", 60)
         monkeypatch.setattr(_workspace, "_validate_workspace", lambda ws: None)
 
         captured: dict = {}
@@ -1270,7 +1270,7 @@ class TestStartTimeoutForwarding:
 
         import rocq_mcp.server as srv
 
-        monkeypatch.setattr(srv, "ROCQ_QUERY_TIMEOUT_CAP", 300)
+        monkeypatch.setattr(_config, "ROCQ_QUERY_TIMEOUT_CAP", 300)
         monkeypatch.setattr(_workspace, "_validate_workspace", lambda ws: None)
 
         captured: dict = {}

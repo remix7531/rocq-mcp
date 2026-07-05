@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import pytest
 
+import rocq_mcp.pet_runtime as _pet_runtime
 from tests.conftest import _MockPetBase, make_lifespan_state
 
 # ---------------------------------------------------------------------------
@@ -66,14 +67,13 @@ class TestFeedbackCollection:
 
     @pytest.fixture(autouse=True)
     def _reset_state_and_semaphore(self):
-        import rocq_mcp.server as srv
         from rocq_mcp.interactive import _state_invalidate_all
 
         _state_invalidate_all()
-        srv._pet_semaphore = None
+        _pet_runtime._pet_semaphore = None
         yield
         _state_invalidate_all()
-        srv._pet_semaphore = None
+        _pet_runtime._pet_semaphore = None
 
     @pytest.fixture(autouse=True)
     def _mock_pytanque(self):
@@ -136,8 +136,8 @@ class TestFeedbackCollection:
         from types import SimpleNamespace
         from unittest.mock import patch
 
-        import rocq_mcp.server
         import rocq_mcp.interactive as _interactive
+        import rocq_mcp.server
 
         call_count = 0
 
@@ -175,8 +175,8 @@ class TestFeedbackCollection:
         from types import SimpleNamespace
         from unittest.mock import patch
 
-        import rocq_mcp.server
         import rocq_mcp.interactive as _interactive
+        import rocq_mcp.server
 
         def fake_run(state, cmd, timeout=None):
             return SimpleNamespace(st=200, proof_finished=False, feedback=[])
@@ -197,13 +197,12 @@ class TestFeedbackCollection:
     @pytest.mark.asyncio
     async def test_feedback_on_error(self):
         """Feedback from successful steps is preserved when a later step fails."""
+        import sys
         from types import SimpleNamespace
         from unittest.mock import patch
 
-        import sys
-
-        import rocq_mcp.server
         import rocq_mcp.interactive as _interactive
+        import rocq_mcp.server
 
         PetanqueError = sys.modules["pytanque"].PetanqueError
 
@@ -248,8 +247,8 @@ class TestFeedbackCollection:
         from types import SimpleNamespace
         from unittest.mock import patch
 
-        import rocq_mcp.server
         import rocq_mcp.interactive as _interactive
+        import rocq_mcp.server
 
         big_output = "X" * 100_000
 
@@ -274,7 +273,7 @@ class TestFeedbackCollection:
         assert "feedback" in result
         fb = result["feedback"]
         assert len(fb) == 2
-        for tactic, text in fb:
+        for _tactic, text in fb:
             assert len(text) < 60_000  # well under 100k
             assert "truncated" in text
             assert "100000 total chars" in text
@@ -285,8 +284,8 @@ class TestFeedbackCollection:
         from types import SimpleNamespace
         from unittest.mock import patch
 
-        import rocq_mcp.server
         import rocq_mcp.interactive as _interactive
+        import rocq_mcp.server
 
         call_count = 0
 
@@ -329,8 +328,8 @@ class TestFeedbackCollection:
         from types import SimpleNamespace
         from unittest.mock import patch
 
-        import rocq_mcp.server
         import rocq_mcp.interactive as _interactive
+        import rocq_mcp.server
 
         def fake_run(state, cmd, timeout=None):
             return SimpleNamespace(
@@ -360,8 +359,8 @@ class TestFeedbackCollection:
         from types import SimpleNamespace
         from unittest.mock import patch
 
-        import rocq_mcp.server
         import rocq_mcp.interactive as _interactive
+        import rocq_mcp.server
 
         def fake_run(state, cmd, timeout=None):
             return SimpleNamespace(
@@ -391,8 +390,8 @@ class TestFeedbackCollection:
         from types import SimpleNamespace
         from unittest.mock import patch
 
-        import rocq_mcp.server
         import rocq_mcp.interactive as _interactive
+        import rocq_mcp.server
 
         def fake_run(state, cmd, timeout=None):
             return SimpleNamespace(
@@ -420,8 +419,8 @@ class TestFeedbackCollection:
         from types import SimpleNamespace
         from unittest.mock import patch
 
-        import rocq_mcp.server
         import rocq_mcp.interactive as _interactive
+        import rocq_mcp.server
 
         call_count = 0
 
@@ -533,14 +532,13 @@ class TestStepMultiFeedback:
 
     @pytest.fixture(autouse=True)
     def _reset_state_and_semaphore(self):
-        import rocq_mcp.server as srv
         from rocq_mcp.interactive import _state_invalidate_all
 
         _state_invalidate_all()
-        srv._pet_semaphore = None
+        _pet_runtime._pet_semaphore = None
         yield
         _state_invalidate_all()
-        srv._pet_semaphore = None
+        _pet_runtime._pet_semaphore = None
 
     @pytest.fixture(autouse=True)
     def _mock_pytanque(self):
@@ -601,8 +599,8 @@ class TestStepMultiFeedback:
         from types import SimpleNamespace
         from unittest.mock import patch
 
-        import rocq_mcp.server
         import rocq_mcp.interactive as _interactive
+        import rocq_mcp.server
 
         def fake_run(state, cmd, timeout=None):
             fb = [(3, f"output of {cmd}")] if "Print" in cmd else []
@@ -631,8 +629,8 @@ class TestStepMultiFeedback:
         from types import SimpleNamespace
         from unittest.mock import patch
 
-        import rocq_mcp.server
         import rocq_mcp.interactive as _interactive
+        import rocq_mcp.server
 
         def fake_run(state, cmd, timeout=None):
             return SimpleNamespace(
@@ -659,8 +657,8 @@ class TestStepMultiFeedback:
         from types import SimpleNamespace
         from unittest.mock import patch
 
-        import rocq_mcp.server
         import rocq_mcp.interactive as _interactive
+        import rocq_mcp.server
 
         def fake_run(state, cmd, timeout=None):
             return SimpleNamespace(st=300, proof_finished=False, feedback=[])
@@ -690,8 +688,8 @@ class TestCheckIncludeWarnings(_MockPetBase):
         from types import SimpleNamespace
         from unittest.mock import patch
 
-        import rocq_mcp.server
         import rocq_mcp.interactive as _interactive
+        import rocq_mcp.server
 
         def fake_run(state, cmd, timeout=None):
             return SimpleNamespace(
@@ -727,8 +725,8 @@ class TestCheckIncludeWarnings(_MockPetBase):
         from types import SimpleNamespace
         from unittest.mock import patch
 
-        import rocq_mcp.server
         import rocq_mcp.interactive as _interactive
+        import rocq_mcp.server
 
         def fake_run(state, cmd, timeout=None):
             return SimpleNamespace(
@@ -769,8 +767,8 @@ class TestStepMultiIncludeWarnings(_MockPetBase):
         from types import SimpleNamespace
         from unittest.mock import patch
 
-        import rocq_mcp.server
         import rocq_mcp.interactive as _interactive
+        import rocq_mcp.server
 
         def fake_run(state, cmd, timeout=None):
             return SimpleNamespace(
@@ -798,8 +796,8 @@ class TestStepMultiIncludeWarnings(_MockPetBase):
         from types import SimpleNamespace
         from unittest.mock import patch
 
-        import rocq_mcp.server
         import rocq_mcp.interactive as _interactive
+        import rocq_mcp.server
 
         def fake_run(state, cmd, timeout=None):
             return SimpleNamespace(
@@ -857,8 +855,8 @@ class TestQueryIncludeWarnings(_MockPetBase):
     async def test_default_keeps_warnings(self):
         from unittest.mock import patch
 
-        import rocq_mcp.server
         import rocq_mcp.interactive as _interactive
+        import rocq_mcp.server
 
         feedback = [(2, "deprecated foo"), (3, "info"), (1, "error")]
         mock_pet, lifespan_state = self._setup_query_pet(feedback)
@@ -892,8 +890,8 @@ class TestQueryIncludeWarnings(_MockPetBase):
     async def test_include_warnings_false_drops_level_2(self):
         from unittest.mock import patch
 
-        import rocq_mcp.server
         import rocq_mcp.interactive as _interactive
+        import rocq_mcp.server
 
         feedback = [(2, "deprecated foo"), (3, "info"), (1, "error")]
         mock_pet, lifespan_state = self._setup_query_pet(feedback)
