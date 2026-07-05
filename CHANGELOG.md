@@ -4,6 +4,8 @@
 
 ### Added
 
+- Server instructions, tool annotations (7 tools read-only), and
+  `version` published over MCP.
 - `degraded: ["<field>:<code>"]` on responses whose best-effort
   enrichment failed (`ROCQ_DEBUG_ENRICHMENT=1` adds detail);
   `enrichment_failures` counters and `lock` contention telemetry in
