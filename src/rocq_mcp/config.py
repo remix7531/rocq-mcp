@@ -4,10 +4,11 @@ Every ``ROCQ_*`` knob the server reads at import time is defined here.
 ``server.py`` re-binds these names into its own namespace for backward
 compatibility — submodules read them as ``_server.<NAME>`` and tests
 monkeypatch them there, both of which keep working because server code
-reads its *own* module globals.  (Three submodule-local knobs stay where
+reads its *own* module globals.  (Four submodule-local knobs stay where
 their consumers and test-patch points live: ``ROCQ_PET_TIMEOUT_GRACE``
 and ``ROCQ_MAX_STATES`` in ``interactive.py``,
-``ROCQ_ENRICHMENT_TIMEOUT_CAP`` in ``compile_enrichment.py``.)
+``ROCQ_ENRICHMENT_TIMEOUT_CAP`` in ``compile_enrichment.py``,
+``ROCQ_DEBUG_ENRICHMENT`` in ``envelope.py``.)
 
 Leaf module: imports nothing from the package.
 """
