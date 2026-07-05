@@ -17,7 +17,7 @@ import warnings
 from pathlib import Path
 from typing import Any, Literal
 
-from fastmcp import FastMCP, Context
+from fastmcp import Context, FastMCP
 from fastmcp.server.lifespan import lifespan
 from mcp.types import ToolAnnotations
 
@@ -71,6 +71,8 @@ from rocq_mcp.envelope import (
     _RECENT_ERROR_MESSAGE_LIMIT,  # noqa: F401  (re-export for tests)
     _fail,
     _no_ctx_fail,
+    _notify,  # noqa: F401  (import-compat)
+    _progress,  # noqa: F401  (import-compat)
     _record_error,
 )
 from rocq_mcp.health import (
@@ -117,6 +119,12 @@ from rocq_mcp.pet_runtime import (  # noqa: F401
     _set_workspace_if_needed,
     _try_close_pet,
 )
+from rocq_mcp.schemas import (
+    CHECK_OUTPUT_SCHEMA,
+    COMPILE_FILE_OUTPUT_SCHEMA,
+    SEARCH_OUTPUT_SCHEMA,
+    STEP_MULTI_OUTPUT_SCHEMA,
+)
 from rocq_mcp.taxonomy import (
     RECENT_ERROR_REASONS as _RECENT_ERROR_REASONS,  # noqa: F401
 )
@@ -158,9 +166,9 @@ def _check_timeout_config(pet_timeout: float, cap: int) -> str | None:
     """
     if pet_timeout > cap:
         return (
-            f"ROCQ_PET_TIMEOUT={pet_timeout} exceeds config.ROCQ_QUERY_TIMEOUT_CAP={cap}; "
+            f"ROCQ_PET_TIMEOUT={pet_timeout} exceeds ROCQ_QUERY_TIMEOUT_CAP={cap}; "
             f"calls without a per-call timeout= will park the pet lock longer "
-            f"than config.ROCQ_QUERY_TIMEOUT_CAP claims."
+            f"than ROCQ_QUERY_TIMEOUT_CAP claims."
         )
     return None
 
@@ -229,6 +237,9 @@ async def app_lifespan(server: Any) -> Any:
     """Server lifespan. Pet is spawned lazily on first pytanque call."""
     state: dict[str, Any] = {
         "pet_client": None,
+        # The server's event loop — lets worker threads schedule MCP
+        # notifications (progress / log) via run_coroutine_threadsafe.
+        "event_loop": asyncio.get_running_loop(),
         "workspace": config.ROCQ_WORKSPACE,
         "pet_timeout": config.ROCQ_PET_TIMEOUT,
         "current_workspace": None,
@@ -520,13 +531,14 @@ async def rocq_compile(
 
 
 @mcp.tool(
+    output_schema=COMPILE_FILE_OUTPUT_SCHEMA,
     annotations=ToolAnnotations(
         title="Compile a .v file (coqc)",
         readOnlyHint=False,
         destructiveHint=False,
         idempotentHint=True,
         openWorldHint=False,
-    )
+    ),
 )
 async def rocq_compile_file(
     file: str,
@@ -534,7 +546,7 @@ async def rocq_compile_file(
     timeout: int = 0,
     include_warnings: bool = True,
     keep_vo: bool = False,
-    mode: str = "full",
+    mode: Literal["full", "vos"] = "full",
     timing: bool = False,
     ctx: Context = None,
 ) -> dict[str, Any]:
@@ -1022,12 +1034,13 @@ async def rocq_start(
 
 
 @mcp.tool(
+    output_schema=STEP_MULTI_OUTPUT_SCHEMA,
     annotations=ToolAnnotations(
         title="Try tactics without committing",
         readOnlyHint=True,
         idempotentHint=True,
         openWorldHint=False,
-    )
+    ),
 )
 async def rocq_step_multi(
     tactics: list[str],
@@ -1098,6 +1111,7 @@ async def rocq_step_multi(
 
 
 @mcp.tool(
+    output_schema=CHECK_OUTPUT_SCHEMA,
     annotations=ToolAnnotations(
         # Additive, never destructive: allocates a fresh state_id and
         # leaves existing states untouched.  Not idempotent (each call
@@ -1107,7 +1121,7 @@ async def rocq_step_multi(
         destructiveHint=False,
         idempotentHint=False,
         openWorldHint=False,
-    )
+    ),
 )
 async def rocq_check(
     body: str,
@@ -1362,12 +1376,13 @@ async def rocq_switch(name: str = "", ctx: Context = None) -> dict[str, Any]:
 
 
 @mcp.tool(
+    output_schema=SEARCH_OUTPUT_SCHEMA,
     annotations=ToolAnnotations(
         title="Search for lemmas and definitions",
         readOnlyHint=True,
         idempotentHint=True,
         openWorldHint=False,
-    )
+    ),
 )
 async def rocq_search(
     pattern: str = "",

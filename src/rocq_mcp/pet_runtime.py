@@ -35,7 +35,12 @@ import psutil
 
 from rocq_mcp import config
 from rocq_mcp import workspace as _workspace
-from rocq_mcp.envelope import _fail, _record_error
+from rocq_mcp.envelope import (
+    _fail,
+    _log_info,
+    _log_warning,
+    _record_error,
+)
 
 # Single source of truth for the per-call "pytanque ImportError" envelope hint.
 # Used by _ensure_pet, _run_with_pet, run_check, and run_step_multi — all of
@@ -148,6 +153,12 @@ def _ensure_pet(lifespan_state: dict[str, Any]) -> Any:
         lifespan_state["pet_client"] = pet
         lifespan_state["pet_started_at"] = time.time()
         lifespan_state["total_spawns"] = prev_spawns + 1
+        _log_info(
+            lifespan_state,
+            f"pet spawned (pid={getattr(pet.process, 'pid', None)}, "
+            f"spawn #{prev_spawns + 1}, "
+            f"generation {int(lifespan_state.get('pet_generation', 0))})",
+        )
     return pet
 
 
@@ -399,6 +410,11 @@ async def _handle_pet_failure(
     ``run_assumptions`` distinguishing ``not_found`` from generic crash).
     """
     if killed_pet:
+        _log_warning(
+            lifespan_state,
+            f"pet killed ({reason} in {tool}); held state_ids are gone — "
+            "the next pet call respawns fresh",
+        )
         _invalidate_pet(lifespan_state)
         await _force_release_pet_lock()
         if on_timeout is not None:

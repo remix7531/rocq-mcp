@@ -56,6 +56,20 @@
   `enrichment_failures` counters and `lock` contention telemetry in
   `rocq_diag`.
 
+### Added (protocol surface)
+
+- **Output schemas** on the four highest-dispatch tools (rocq_check,
+  rocq_step_multi, rocq_compile_file, rocq_search): permissive
+  declarations (`required: ["success"]`, extra keys allowed) whose
+  `reason` enum derives from the taxonomy. `mode` on rocq_compile_file
+  is now schema-enforced (`"full" | "vos"`).
+- **Progress notifications**: per-tactic on rocq_step_multi, per-chunk
+  on the multi-error walker, per-phase on rocq_verify — thread-safe,
+  best-effort (no-ops without a client progressToken).
+- **Lifecycle logging** (MCP log notifications): pet spawn (info),
+  pet killed with the failure reason (warning), force_restart
+  (warning).
+
 ### Changed
 
 - Tool descriptions rewritten as ≤2KB contracts; deep reference moved
@@ -68,8 +82,8 @@
 
 - `server.py` decomposed (2,929 → ~1,700 lines; zero behavior change):
   workspace/path/dune logic → `workspace.py`, pet lifecycle + lock +
-  watchdog + `_run_with_pet` → `pet_runtime.py`. The
-  server↔submodule circular import is eliminated
+  watchdog + `_run_with_pet` → `pet_runtime.py`, notification helpers →
+  `envelope.py`. The server↔submodule circular import is eliminated
   (domain modules import config/taxonomy/envelope/workspace/pet_runtime
   only).
   Monkeypatch targets moved with the code: pet lifecycle patches on

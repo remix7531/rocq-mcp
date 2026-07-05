@@ -222,6 +222,7 @@ src/rocq_mcp/
   config.py              Env-derived configuration (most ROCQ_* knobs)
   taxonomy.py            The failure-reason taxonomy (wire protocol)
   envelope.py            Failure envelope + degraded-enrichment reporting
+  schemas.py             Output schemas for the high-dispatch tools
   workspace.py           Workspace validation, project markers, dune/coqc flags
   pet_runtime.py         pet subprocess lifecycle: lock, watchdog, _run_with_pet
   compile.py             coqc-based tools: compile, compile_file, verify

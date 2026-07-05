@@ -17,27 +17,27 @@ import time
 from pathlib import Path
 from typing import Any
 
-from rocq_mcp.verify import (
-    _check_forbidden_commands,
-    _rocq_scan,
-    build_verification_source,
-    build_shared_defs_verification_source,
-    build_direct_verification_source,
-    build_direct_type_check_source,
-    parse_check_type,
-    normalize_type_for_comparison,
-    classify_toc_detail,
-    DefCategory,
-    DefinitionInfo,
-    parse_and_classify_assumptions,
-    ProblemStructure,
-    verification_hint,
-    _validate_rocq_identifier,
-)
-
 from rocq_mcp import config
+from rocq_mcp import envelope as _envelope
 from rocq_mcp import pet_runtime as _pet_runtime
 from rocq_mcp import workspace as _workspace
+from rocq_mcp.verify import (
+    DefCategory,
+    DefinitionInfo,
+    ProblemStructure,
+    _check_forbidden_commands,
+    _rocq_scan,
+    _validate_rocq_identifier,
+    build_direct_type_check_source,
+    build_direct_verification_source,
+    build_shared_defs_verification_source,
+    build_verification_source,
+    classify_toc_detail,
+    normalize_type_for_comparison,
+    parse_and_classify_assumptions,
+    parse_check_type,
+    verification_hint,
+)
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -1425,6 +1425,7 @@ async def run_verify(
     t0 = time.monotonic()
 
     # Phase 1: Standard Module M
+    _envelope._progress(lifespan_state, 1, 3, "verify: Module M sandbox")
     phase1_result, phase1_failure = _run_phase1_module_m(
         proof,
         problem_name,
@@ -1437,6 +1438,9 @@ async def run_verify(
         return phase1_result
 
     # Phase 2: Shared-defs Module M (includes Phase 3 fallback)
+    _envelope._progress(
+        lifespan_state, 2, 3, "verify: shared-defs sandbox (phase 3 may follow)"
+    )
     return await _run_phase2_shared_defs(
         proof,
         problem_name,
