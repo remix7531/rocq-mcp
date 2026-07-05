@@ -16,6 +16,7 @@ from typing import Any, Literal, TypedDict
 
 import rocq_mcp.server as _server
 from rocq_mcp import taxonomy
+from rocq_mcp import workspace as _workspace
 from rocq_mcp.compile import (
     _PROOF_FILE_LABEL,
     _first_error_from_positions,
@@ -153,7 +154,7 @@ async def _capture_compile_error_state(
             return {"status": "crashed", "state": None}
     finally:
         if temp_path is not None:
-            _server._cleanup_coqc_artifacts(temp_path)
+            _workspace._cleanup_coqc_artifacts(temp_path)
 
     if not isinstance(state_result, dict):
         return {"status": "crashed", "state": None}
@@ -362,7 +363,7 @@ async def run_compile_file_with_state(
     gains a per-sentence ``timing`` field when enabled.
     """
     try:
-        resolved_file = _server._resolve_file_in_workspace(file, workspace)
+        resolved_file = _workspace._resolve_file_in_workspace(file, workspace)
     except (ValueError, FileNotFoundError):
         resolved_file = None
 
@@ -371,7 +372,7 @@ async def run_compile_file_with_state(
     # interactive sessions in the same workspace.  Both snapshots use
     # the same helper; the before/after diff is the only signal.
     ws_path = Path(workspace).resolve()
-    vo_before = _server._snapshot_vo_mtimes(ws_path)
+    vo_before = _workspace._snapshot_vo_mtimes(ws_path)
     result = run_compile_file(
         file,
         workspace,
@@ -381,9 +382,9 @@ async def run_compile_file_with_state(
         mode=mode,
         timing=timing,
     )
-    vo_after = _server._snapshot_vo_mtimes(ws_path)
+    vo_after = _workspace._snapshot_vo_mtimes(ws_path)
 
-    vo_warning = _server._maybe_vo_rebuild_warning(
+    vo_warning = _workspace._maybe_vo_rebuild_warning(
         str(ws_path),
         before_mtimes=vo_before,
         after_mtimes=vo_after,
