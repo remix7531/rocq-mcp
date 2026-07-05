@@ -46,20 +46,31 @@ covers what shows up conditionally and how output size is bounded.
 - `focus_depth` — open `{...}`/bullet focus frames above the goal (0 at
   top level). Omitted when goal state is unavailable.
 - `shelved_goals` / `given_up_goals` — counts, present when non-zero.
-- On `proof_finished: true` — `proof_tactics` (root-to-leaf tactic list)
-  + `proof_hint`; or the `proof_tactics_status` family on a broken walk
-  (failures guide).
+- On `proof_finished: true` — `proof_tactics` (root-to-leaf tactic
+  list), and when the statement is recoverable also `proof_script` (a
+  ready-to-paste declaration + Proof. + tactics + Qed.; preamble-mode
+  sessions prepend their imports), `statement`, and `statement_source`
+  (`"file"` | `"session_commands"` | `"unrecoverable"`). The
+  `proof_tactics_status` family now fires only if the finished state
+  itself was evicted (failures guide).
 - On failure — `last_valid_state_id`, `failed_command` (failures guide).
 
 ## rocq_step_multi response
 
 - `results: [entry, ...]` in input order. First tactic reaching a proof
-  state: `{tactic, success: true, goals, proof_finished, focus_depth?,
-  shelved_goals?, given_up_goals?, feedback?}`. Later tactics reaching
-  the SAME state are deduplicated: `{tactic, success: true,
-  proof_finished, same_outcome_as: <index into results>, feedback?}` —
-  look up the referenced entry for the goals. Failed entry:
-  `{tactic, success: false, reason: "tactic_failed", error}`.
+  state: `{tactic, success: true, goals, goals_count, proof_finished,
+  time_ms, focus_depth?, shelved_goals?, given_up_goals?, feedback?}`.
+  Later tactics reaching the SAME state are deduplicated: `{tactic,
+  success: true, proof_finished, goals_count, same_outcome_as: <index
+  into results>, time_ms, feedback?}` — look up the referenced entry
+  for the goals. Failed entry: `{tactic, success: false, reason:
+  "tactic_failed", error, time_ms}`.
+- `summary: {tried, succeeded, finished: [tactics], distinct_outcomes,
+  best?: {tactic, goals_count}}` — `best` = fewest goals remaining,
+  proof-finishing tactics first.
+- `timeouts=[...]` gives each tactic its own budget (batch wall clock =
+  the sum); `preset="auto"` appends the automation battery (deduped,
+  capped at 20; `preset_truncated: true` when cut).
 - `distinct_outcomes` — count of unique successful proof states reached.
 - Per-entry `goals` respects `goals_format` (pretty/structured/
   names_only); pretty capped at 8,000 chars. Per-entry `feedback` capped
@@ -75,9 +86,30 @@ covers what shows up conditionally and how output size is bounded.
   cap and appends a "N more results" line — use it for broad `Search`
   patterns.
 - `include_warnings=False` drops LSP Warning-severity feedback entries
-  (6 tools accept this; keeps output compact on warning-heavy files).
+  (7 tools accept this; keeps output compact on warning-heavy files).
 - `rocq_toc` returns the outline as a single `output` string under
   the same 8,000-char cap — no per-name cap or overflow fields.
+
+## rocq_search response
+
+- `hits: [{name, type?} | {raw}]` — one entry per Search hit, parsed as
+  `name: type`; unparseable messages kept as `{raw}`. `include_types=false`
+  drops the types. With multiple `patterns`, each hit carries
+  `matched_patterns` (multi-pattern hits are the strongest premise
+  candidates).
+- `total` / `offset` / `truncated` — pagination over the merged,
+  deduplicated hit list (re-run with a higher `offset` for the next page).
+- `query` — the exact Search command(s) executed (string, or list in
+  fan-out mode).
+- A pattern Coq rejects fails with `reason: "query_rejected"` and the
+  offending command in the message.
+
+## rocq_goal response
+
+- `goals` (per `goals_format`) or `goals_diff` (when `diff_from` given),
+  plus `goals_count`, `proof_finished`, `focus_depth?`,
+  `shelved_goals?`, `given_up_goals?`.
+- `stateless: true` — no state was registered; the LRU table is untouched.
 
 ## rocq_assumptions response
 
@@ -155,10 +187,10 @@ pet {path, version, pytanque_importable}}`, `pet {running, pid}`,
 
 | Control | Tools | Effect |
 |---|---|---|
-| `goals_format` | check (5 modes), start, step_multi (3 modes) | Goals representation: `pretty` / `structured` / `names_only`, plus check-only `diff` / `none` |
+| `goals_format` | check (5 modes), start, step_multi, goal (3 modes) | Goals representation: `pretty` / `structured` / `names_only`, plus check-only `diff` / `none` |
 | `include_raw` | rocq_assumptions | Opt back into the verbatim `raw_output` |
 | `max_results` | rocq_query | Cap Search hits before char truncation |
-| `include_warnings=False` | compile, compile_file, verify, query, check, step_multi | Drop warning-severity feedback |
+| `include_warnings=False` | compile, compile_file, verify, query, search, check, step_multi | Drop warning-severity feedback |
 | `timeout=<s>` | pet-routed tools | Per-call budget, clamped to `ROCQ_QUERY_TIMEOUT_CAP` (response carries `clamped_timeout`) |
 | `timeout=<s>` | compile, compile_file, verify | Per-call budget, used as-is (0 = `ROCQ_COQC_TIMEOUT` / `ROCQ_VERIFY_TIMEOUT`) |
 | Input cap | source/body/proof params | `ROCQ_MAX_SOURCE_SIZE` (default 1 MB) rejects oversize input |

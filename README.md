@@ -6,7 +6,7 @@
 
 An [MCP](https://modelcontextprotocol.io/) server for [Rocq](https://rocq-prover.org/) (formerly Coq) proof development. It exposes compilation, verification, querying, and interactive tactic stepping as MCP tools, so that LLM agents can write and check Rocq proofs.
 
-- **Thirteen MCP tools** backed by [pet](https://github.com/ejgallego/coq-lsp) (Rocq's coq-lsp interactive backend).
+- **Fifteen MCP tools** backed by [pet](https://github.com/ejgallego/coq-lsp) (Rocq's coq-lsp interactive backend).
 - **Interactive session** that keeps imports warm across calls — inspect goals, search the environment, step through tactics without re-paying coqc's import cost.
 - **Staged verification.** Sandboxed audit of admits, axioms, and statement mismatches.
 - **Agent-first surface.** Server instructions, tool annotations, on-demand documentation resources, and workflow prompts.
@@ -19,7 +19,7 @@ An [MCP](https://modelcontextprotocol.io/) server for [Rocq](https://rocq-prover
 | **`rocq_compile`** | Compile Rocq source from a string buffer via coqc. |
 | **`rocq_compile_file`** | Compile a .v file on disk via coqc — whole-file check and final verification. |
 | **`rocq_verify`** | Verify a proof proves the original statement — sandboxed admit/axiom/statement check. |
-| **`rocq_query`** | Run a Rocq query (Search / Check / Print / About / Locate) and return its output. |
+| **`rocq_query`** | Run a raw Rocq query (Check / Print / About / Locate / Search) and return its output. |
 | **`rocq_assumptions`** | List the axioms a theorem depends on (Print Assumptions), parsed. |
 | **`rocq_toc`** | Outline a .v file: definitions, lemmas, theorems, and sections as a hierarchy. |
 | **`rocq_notations`** | Resolve every notation in a statement: which notation, scope, and module. |
@@ -29,6 +29,8 @@ An [MCP](https://modelcontextprotocol.io/) server for [Rocq](https://rocq-prover
 | **`rocq_diag`** | Server runtime diagnostics: pet health, memory, lock contention, recent errors. |
 | **`rocq_health`** | Toolchain health: is coqc resolvable, and which opam switch is this server on? |
 | **`rocq_switch`** | Switch the running server to another opam switch — process-global and destructive. |
+| **`rocq_search`** | Search the environment for lemmas/definitions matching a pattern — structured hits. |
+| **`rocq_goal`** | Show proof goals at a live state_id or a file position — registers no state. |
 <!-- END GENERATED: tools -->
 
 ## Agent documentation
@@ -57,10 +59,10 @@ documentation ships inside the server itself**:
   workflows.
 
 Every failure response carries `{success: false, error, reason}` with a
-fixed 11-value `reason` taxonomy — agents dispatch on `reason`, never on
+fixed 12-value `reason` taxonomy — agents dispatch on `reason`, never on
 message text: `validation`, `not_found`, `timeout`, `crashed`,
 `memory_exhausted`, `lock_contended`, `unavailable`, `tactic_failed`,
-`compile_error`, `axiom_dependency`, `type_mismatch`.
+`query_rejected`, `compile_error`, `axiom_dependency`, `type_mismatch`.
 
 ## Prerequisites
 
@@ -76,7 +78,8 @@ message text: `validation`, `not_found`, `timeout`, `crashed`,
   enrichment / multi-error walker on `rocq_compile_file`. Without `pet`
   you fall back to coqc-only operation (`rocq_compile`,
   `rocq_compile_file` with first error only, `rocq_verify`, `rocq_diag`,
-  `rocq_health`) — a substantial reduction in what an agent can do.
+  `rocq_health`, `rocq_switch`) — a substantial reduction in what an
+  agent can do.
 - **Python 3.11+**
 
 ## Installation
@@ -163,7 +166,7 @@ The verification tool (`rocq_verify`) uses defense in depth with three verificat
 
 ### Verification phases
 
-`rocq_verify` tries up to three phases in sequence, falling back to the next if the previous one times out:
+`rocq_verify` tries up to three phases, falling back when a phase times out, fails, or does not apply: a Phase-1 timeout skips straight to Phase 3 (Phase 2 uses the same Module M sandbox and would time out too); a Phase-1 compile failure tries Phase 2 first, then Phase 3:
 
 1. **Phase 1 — Module M sandbox.** The proof is wrapped inside `Module M. ... End M.`. The theorem is re-stated outside and proved via `exact M.<name>`. This is the strongest sandbox but can time out on compute-heavy proofs.
 2. **Phase 2 — Shared-defs template.** For problems with Inductive/Record/Definition types, type definitions are placed outside Module M to avoid nominal typing mismatches, while the proof stays inside the sandbox.
@@ -214,7 +217,7 @@ automatically when `coqc`/`pet` are unavailable (CI installs both).
 
 ```
 src/rocq_mcp/
-  server.py              MCP app: instructions, 13 tool wrappers, resources,
+  server.py              MCP app: instructions, 15 tool wrappers, resources,
                          prompts
   config.py              Env-derived configuration (most ROCQ_* knobs)
   taxonomy.py            The failure-reason taxonomy (wire protocol)
@@ -224,7 +227,8 @@ src/rocq_mcp/
   compile.py             coqc-based tools: compile, compile_file, verify
   compile_enrichment.py  Compile-error proof-state capture + multi-error walk
   interactive.py         pytanque-based tools: start, check, step_multi,
-                         query, assumptions, toc, notations
+                         query, search, goal, assumptions, toc,
+                         notations
   verify.py              Rocq lexer scanner, Module M verification,
                          Print Assumptions parsing
   proof_walk.py          Whole-file multi-error walker

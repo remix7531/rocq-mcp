@@ -16,6 +16,7 @@ recorded into the `recent_errors` ring buffer that `rocq_diag` returns.
 | `lock_contended` | pet-routed tools | Another call holds the pet lock (pet is NOT killed). Retry after in-flight calls settle; under multi-agent sharing see the concurrency guide. |
 | `unavailable` | pet-routed tools | pytanque / the `pet` binary is not installed. Only coqc-based tools work; see README prerequisites. |
 | `tactic_failed` | rocq_check (mid-batch) | Coq rejected a tactic — a *proof* problem, not a transport problem. Use `last_valid_state_id` (below). |
+| `query_rejected` | rocq_search | Coq rejected the Search pattern/filter syntax. Fix the pattern (see rocq_query for raw vernacular escape hatch). |
 | `compile_error` | rocq_compile, rocq_compile_file, rocq_verify | coqc returned non-zero. Use `error_positions` / `state_capture_status` / `errors` (below). |
 | `axiom_dependency` | rocq_verify | The proof relies on `Admitted`/`admit` or a non-whitelisted axiom. |
 | `type_mismatch` | rocq_verify | Phase-3 check: the proof proves a different type than the problem statement. |
@@ -49,7 +50,10 @@ capture the interactive proof state at the error position:
 On `compile_error` with pet available, the response may carry
 `errors: list` — pet's structured walk of the whole file, one entry per
 failing declaration: `{proof_name, kind, start_line, end_line, code,
-message}`. This surfaces errors *beyond* the first one coqc reports;
+message, start_args}` — `start_args` is a ready-made `{file, line,
+character}` for `rocq_start`/`rocq_goal` at the failing declaration
+(lines 0-based). This surfaces errors *beyond* the first one coqc
+reports;
 cascade failures inside one proof body are deduplicated. The field can be
 **present and empty** (`errors: []`) when the walker ran but pet did not
 reproduce the coqc failure — read that as "no additional errors found",
@@ -69,11 +73,14 @@ Fuzzy-match the requested name against this list to recover from typos.
 ## proof_tactics_status (broken chain on a finished proof)
 
 When `rocq_check` reports `proof_finished: true` it normally returns
-`proof_tactics` (the root-to-leaf tactic list). If an ancestor state was
-LRU-evicted or a cycle was detected, `proof_tactics` and `proof_hint` are
-omitted and the response carries `proof_tactics_status`
-(`"ancestor_evicted"` | `"cycle"`), `proof_tactics_broken_at` (the state
-id where the walk stopped) and `proof_tactics_hint`. You never see a
+`proof_tactics` (the root-to-leaf tactic list). The chain is
+materialized at each state's creation, so ancestor eviction can no
+longer break it; the only remaining break is the finished state itself
+being evicted before the response was assembled (LRU churn or a pet
+restart mid-call). Then `proof_tactics` and `proof_hint` are omitted
+and the response carries `proof_tactics_status: "ancestor_evicted"`
+(`"cycle"` is reserved but no longer produced), `proof_tactics_broken_at`
+(the finished state's id) and `proof_tactics_hint`. You never see a
 half-chain. Recovery: re-run the assembled tactic sequence you already
 know from your own transcript, or restart with `rocq_start` and replay.
 
