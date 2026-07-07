@@ -177,26 +177,44 @@ The remaining cross-agent costs are pure latency: workspace-swap thrash when pee
 
 **Orchestrator-side monitoring: `rocq_diag`.**  When you cannot deploy a separate `rocq-mcp` per sub-agent (see the Claude Code escape hatch below for one workaround), `rocq_diag` is the natural primitive for spotting cross-agent interference.  Useful checks between sub-agent dispatches: `live_states[*].file` shows entries created by peer callers (sharing signal when agents are on disjoint files); `memory.pet_rss_mb` against `max_rss_mb_threshold` catches accumulated Fleche bloat before it forces a restart; `recent_errors` shows whether a peer just hit `lock_contended` / `memory_exhausted` / a `force_restart`; `load_average["1m"]` against the host CPU count distinguishes CPU saturation from a diverging tactic when a timeout fires (`None` on platforms without `os.getloadavg`).  Field reports suggest this tool is consistently underused — worth a checklist line in your orchestrator prompt.
 
-**Operator-side hardening:** the cleanest deployment is one `rocq-mcp` subprocess per concurrent agent.  Over stdio this happens naturally when each MCP client launches its own server; the case that needs care is parallel sub-agents within one client, which inherit the parent's MCP connections and share one `rocq-mcp`.  If you're orchestrating parallel Rocq work, prefer separate top-level invocations over one parent with concurrent sub-agents.
+**Operator-side hardening:** the cleanest deployment is one `rocq-mcp` subprocess per concurrent agent.  Over stdio this happens naturally when each MCP client launches its own server; the case that needs care is parallel sub-agents within one client, which inherit the parent's MCP connections and share one `rocq-mcp`.  If you're orchestrating parallel Rocq work, prefer separate top-level invocations over one parent with concurrent sub-agents — or, within one client, the named-pool pattern below.
 
-*Claude Code escape hatch.*  Sub-agents in `.claude/agents/<name>.md` accept an inline `mcpServers` entry in their frontmatter ([Claude Code docs](https://code.claude.com/docs/en/sub-agents#scope-mcp-servers-to-a-subagent)); an inline definition gives that sub-agent its own `rocq-mcp` subprocess (its own `pet`, `_state_table`, and `current_workspace`), connected when the sub-agent starts and torn down when it finishes.  A string reference instead shares the parent's connection.  Inline definitions let parallel sub-agents each pay the import-load cost once on their own pet rather than thrashing a shared one:
+*Claude Code sub-agent scoping — and its limit.*  Sub-agents in `.claude/agents/<name>.md` accept an inline `mcpServers` entry in their frontmatter ([Claude Code docs](https://code.claude.com/docs/en/sub-agents#scope-mcp-servers-to-a-subagent)).  An inline definition scopes a `rocq-mcp` server **to that sub-agent** — connected when the sub-agent starts, torn down when it finishes, and hidden from the main thread; a bare string reference shares the parent's connection instead.
+
+**This scopes the server to the *definition*, not to each *instance*.**  Claude Code keys MCP servers **by name** — one server process per distinct name per session, shared by every sub-agent instance that references that name.  So `N` concurrently-running instances of the *same* sub-agent definition still share **one** `rocq-mcp` `pet`: the inline entry isolates a sub-agent's server from the *parent's*, not one instance from another.  (Name it something **unique**, too — an inline server literally named `rocq-mcp` collides with a session-level `rocq-mcp` server and is silently aliased to it.)
 
 ```yaml
 mcpServers:
-  - rocq-mcp:
+  - rocqprover:            # a UNIQUE name — not "rocq-mcp"
       type: stdio
       command: rocq-mcp
 ```
 
-*Worktree per sub-agent.*  The escape hatch above isolates the `pet` subprocess; for filesystem isolation — so concurrent sub-agents can edit `.v` files without staling each other's interactive sessions (see *Stale file warning* above) — pair the per-sub-agent `mcpServers` entry with a separate `git worktree` per sub-agent, and point `ROCQ_WORKSPACE` at it:
+*Isolating concurrent instances — the named pool.*  Because the only isolation unit the harness exposes is the server **name**, give parallel work a **pool** of `N` sub-agent definitions, each with a **distinct** name — `rocq-prover-1.md` … `rocq-prover-N.md`, declaring servers `rocqprover1` … `rocqproverN`.  The harness then spawns `N` separate `rocq-mcp` processes, and the orchestrator hands **distinct pool members to concurrently-running slots** (round-robin the sub-agent type, capping concurrency at `N`).  The pool is additive — keep a plain `rocq-mcp` reference for sequential/shared runs — and size `N` to your parallelism budget (pets are RAM-heavy; pair with `ROCQ_MAX_PET_RSS_MB`).
 
 ```yaml
+# .claude/agents/rocq-prover-1.md  (repeat for -2 … -N, bumping the number)
 mcpServers:
-  - rocq-mcp:
+  - rocqprover1:
       type: stdio
       command: rocq-mcp
       env:
-        ROCQ_WORKSPACE: /path/to/worktree-A
+        ROCQ_MAX_PET_RSS_MB: "8000"
+```
+
+Two caveats.  **Registration happens at startup** — Claude Code snapshots the agent registry when the session begins, so newly-added `rocq-prover-*.md` files are not selectable until you **restart** the client (`claude --continue` keeps the conversation).  And **plugin sub-agents ignore `mcpServers`** — sub-agents provided by a *plugin* silently drop the `mcpServers` / `hooks` / `permissionMode` frontmatter, so the pool must live in plain `.claude/agents/` files.
+
+Server-side multi-tenancy is not an alternative here: over stdio the harness gives one server process a single connection carrying interleaved calls with no per-caller identity, so `rocq-mcp` cannot tell sub-agents apart from inside one process.  The name-keyed pool (or separate top-level `claude` invocations) is the only reliable isolation lever.
+
+*Worktree per pool member.*  A pool member isolates its own `pet` subprocess; for filesystem isolation — so concurrent sub-agents can edit `.v` files without staling each other's interactive sessions (see *Stale file warning* above) — pair each member's `mcpServers` entry with a separate `git worktree`, and point `ROCQ_WORKSPACE` at it:
+
+```yaml
+mcpServers:
+  - rocqprover1:
+      type: stdio
+      command: rocq-mcp
+      env:
+        ROCQ_WORKSPACE: /path/to/worktree-1
 ```
 
 Each worktree carries its own checkout, its own auto-generated `_RocqProject` (see *Prerequisites*), and its own scratch files — neither sub-agent can clobber the other's interactive sessions through a file edit, and `_RocqProject` regeneration in one worktree does not invalidate the other's load paths.
